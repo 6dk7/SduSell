@@ -1,0 +1,28 @@
+{
+  "listings": [
+    {
+      "id": 1,
+      "title": "Calculus textbook",
+      "price": 5000,
+      "seller": "aigerim"
+    },
+    {
+      "id": 2,
+      "title": "Desk lamp",
+      "price": 3000,
+      "seller": "dias"
+    },
+    {
+      "title": "Used bicycle",
+      "price": 25000,
+      "seller": "student1",
+      "id": 3
+    },
+    {
+      "title": "book F. Neitzche Beyond good and evil",
+      "price": 7800,
+      "seller": "damir",
+      "id": 4
+    }
+  ]
+}
