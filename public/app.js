@@ -144,7 +144,7 @@ function setSession(token, user) {
 }
 
 function renderActions() {
-  $actions.replaceChildren();
+  $actions.replaceChildren(h('a', { class: 'discover-link', href: '#/discover' }, '✦ Finds'));
   const sell = h('a', { class: 'btn btn-sun', href: '#/sell' }, 'Post a listing');
   if (!state.user) {
     $actions.append(
@@ -416,7 +416,141 @@ async function viewHome(params) {
   );
 
   $q.value = f.q;
-  return h('div', { class: 'page' }, chips, h('div', { class: 'home-layout' }, filters, results));
+  const discover = h('a', { class: 'discovery-banner', href: '#/discover' },
+    h('div', {}, h('span', { class: 'eyebrow' }, 'A little curiosity goes a long way'),
+      h('h2', {}, 'Your next great find is one swipe away.'),
+      h('p', {}, 'Explore SDU Finds. Save what you love, skip what you don’t.')),
+    h('span', { class: 'btn btn-sun' }, 'Explore finds ↗'));
+  return h('div', { class: 'page' }, discover, chips, h('div', { class: 'home-layout' }, filters, results));
+}
+
+
+// One card at a time. Only explicit saves affect recommendations, never dwell time.
+async function viewDiscovery() {
+  document.title = 'SDU Finds - SduSell';
+  $q.value = '';
+  const seen = new Set();
+  let queue = [], busy = false, ended = false;
+  const stage = h('section', { class: 'discovery-stage', tabindex: 0, 'aria-label': 'Finds. Swipe up or press Arrow Down for the next item.' });
+  const status = h('p', { class: 'discovery-status visually-hidden', role: 'status', 'aria-live': 'polite' });
+  const next = h('button', { class: 'btn btn-quiet', type: 'button', onclick: () => advance() }, 'Next find ↓');
+  const counter = h('span', { class: 'muted' });
+  const page = h('div', { class: 'page discovery-page' },
+    h('div', { class: 'discovery-heading' },
+      h('div', {}, h('span', { class: 'eyebrow' }, 'Less searching. More discovering.'),
+        h('h1', { class: 'page-title' }, 'SDU Finds'),
+        h('p', { class: 'muted' }, 'A fresh perspective on the marketplace.')),
+      h('a', { class: 'btn btn-quiet', href: '#/' }, 'Browse all ↗')),
+    h('div', { class: 'discovery-layout' }, stage,
+      h('aside', { class: 'discovery-guide' }, h('span', { class: 'discovery-spark', 'aria-hidden': 'true' }, '✦'),
+        h('h2', {}, 'Good finds, your way.'),
+        h('p', {}, 'Save a find and we’ll show you more from that category. Every fourth recommendation makes room for something different.'),
+        h('ul', {}, h('li', {}, '♡ Save → keep it in Favorites'), h('li', {}, '× Not for me → hide this find'), h('li', {}, '↓ Swipe, scroll or use your keyboard')),
+        h('p', { class: 'muted' }, state.user ? 'Your saves and hidden finds are kept with your account.' : 'Explore freely. Log in to save finds and keep your preferences.'))),
+    h('div', { class: 'discovery-controls' }, counter, next), status);
+
+  async function refill() {
+    const params = new URLSearchParams({ limit: '12', exclude: [...seen].join(',') });
+    const data = await api(`/discovery?${params}`);
+    queue = data.items.filter(l => !seen.has(l.id));
+  }
+  function draw() {
+    const l = queue[0];
+    if (!l || seen.size >= 100) {
+      ended = true;
+      next.hidden = true;
+      stage.replaceChildren(emptyState('You’re all caught up.', 'Great finds deserve a pause. Come back for new listings, or browse the full marketplace.',
+        h('a', { class: 'btn btn-sun', href: '#/' }, 'Browse marketplace')));
+      counter.textContent = `${seen.size} finds explored`;
+      status.textContent = 'End of this collection.';
+      return;
+    }
+    seen.add(l.id);
+    counter.textContent = `Find ${seen.size} · a little discovery break`;
+    status.textContent = `${l.title}. ${money(l.price)}. ${l.reason}`;
+    const save = h('button', { class: 'btn discovery-save', type: 'button', onclick: () => react('like') }, '♡ Save find');
+    const pass = h('button', { class: 'btn btn-quiet', type: 'button', onclick: () => react('pass') }, '× Not for me');
+    stage.replaceChildren(h('article', { class: 'discovery-card' },
+      h('a', { class: 'discovery-media', href: `#/listing/${l.id}`, 'aria-label': `View ${l.title}` },
+        l.cover ? h('img', { src: l.cover, alt: l.title }) : placeholder(l.category),
+        h('span', { class: 'discovery-category' }, `${catStyle(l.category).emoji} ${l.category}`)),
+      h('div', { class: 'discovery-body' },
+        h('p', { class: 'discovery-reason' }, `✦ ${l.reason}`),
+        h('div', { class: 'discovery-title-row' }, h('h2', {}, l.title), h('p', { class: 'price price-lg' }, money(l.price))),
+        h('p', { class: 'muted' }, `${l.city} · ${l.condition === 'new' ? 'New' : 'Used'} · ${l.seller_name}`),
+        h('p', { class: 'discovery-description' }, l.description || 'Take a closer look and contact the seller.'),
+        h('div', { class: 'discovery-card-actions' }, save, pass, h('a', { class: 'discovery-details', href: `#/listing/${l.id}` }, 'View details ↗')))));
+  }
+  function setBusy(value) {
+    busy = value;
+    next.disabled = value;
+    stage.setAttribute('aria-busy', String(value));
+    stage.querySelectorAll('button').forEach(b => { b.disabled = value; });
+  }
+  async function advance(reaction) {
+    if (busy || ended) return;
+    const restoreFocus = stage.contains(document.activeElement) || document.activeElement === next;
+    setBusy(true);
+    const previousQueue = [...queue];
+    let committed = false;
+    try {
+      if (reaction) {
+        await api(`/discovery/${queue[0].id}/reaction`, { method: 'POST', body: { reaction } });
+        committed = true;
+        queue = [];
+        toast(reaction === 'like' ? 'Saved to Favorites. More finds like this are on their way.' : 'Hidden from your Finds.');
+        // Refresh ranking immediately after an explicit preference.
+        await refill();
+      } else {
+        queue.shift();
+        if (!queue.length && seen.size < 100) await refill();
+      }
+      draw();
+    } catch (ex) {
+      if (committed || !previousQueue.length) {
+        queue = [];
+        stage.replaceChildren(emptyState(committed ? 'Your preference is saved.' : 'Let’s reconnect.',
+          'We couldn’t load the next find. Retry when your connection is back.',
+          h('button', { class: 'btn btn-primary', type: 'button', onclick: () => advance() }, 'Retry next find')));
+      } else queue = previousQueue;
+      status.textContent = ex.message;
+      toast(ex.message);
+    } finally {
+      setBusy(false);
+      if (restoreFocus && page.isConnected) stage.focus({ preventScroll: true });
+    }
+  }
+  function react(reaction) {
+    if (!state.user) {
+      if (reaction === 'like') { openAuth('login', 'Log in to save your finds'); return; }
+      advance();
+    } else advance(reaction);
+  }
+  stage.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' && !e.target.closest('button, a')) { e.preventDefault(); advance(); }
+  });
+  let wheelTotal = 0, lastWheel = 0;
+  stage.addEventListener('wheel', e => {
+    // Capture only deliberate downward scrolling over the card; leave page scrolling available elsewhere.
+    if (e.ctrlKey || e.deltaY <= 0 || ended) return;
+    e.preventDefault();
+    const now = Date.now();
+    if (now - lastWheel < 900) return;
+    wheelTotal += e.deltaY;
+    if (wheelTotal > 100) { wheelTotal = 0; lastWheel = now; advance(); }
+  }, { passive: false });
+  let touchStart = null;
+  stage.addEventListener('touchstart', e => { touchStart = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null; }, { passive: true });
+  stage.addEventListener('touchend', e => {
+    if (!touchStart || !e.changedTouches.length) return;
+    const dx = e.changedTouches[0].clientX - touchStart.x;
+    const dy = e.changedTouches[0].clientY - touchStart.y;
+    touchStart = null;
+    if (dy < -70 && Math.abs(dy) > Math.abs(dx)) advance();
+  }, { passive: true });
+  await refill();
+  draw();
+  return page;
 }
 
 async function viewListing(id) {
@@ -709,6 +843,7 @@ async function render() {
   try {
     let node;
     if (!parts.length) node = await viewHome(new URLSearchParams(qs));
+    else if (parts[0] === 'discover') node = await viewDiscovery();
     else if (parts[0] === 'listing' && parts[1]) node = await viewListing(Number(parts[1]));
     else if (parts[0] === 'sell') node = await viewSell();
     else if (parts[0] === 'edit' && parts[1]) node = await viewSell(Number(parts[1]));

@@ -205,6 +205,60 @@ function getListing(id, viewer) {
   return { ...shape(row), images, seller: { ...seller, active_listings: activeCount } };
 }
 
+function discoveryListings(url, viewer) {
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit')) || 20, 1), 50);
+  const excluded = (url.searchParams.get('exclude') || '').split(',').filter(Boolean).map(Number);
+  if (excluded.length > 100 || excluded.some((id) => !Number.isSafeInteger(id) || id < 1)) {
+    throw new HttpError(400, 'Exclude must contain at most 100 listing IDs');
+  }
+  const viewerId = viewer ? viewer.id : 0;
+  const where = ["l.status = 'active'"];
+  const params = [];
+  if (viewer) {
+    where.push('l.user_id != ?'); params.push(viewerId);
+    where.push('NOT EXISTS (SELECT 1 FROM favorites f WHERE f.user_id = ? AND f.listing_id = l.id)');
+    params.push(viewerId);
+    where.push("NOT EXISTS (SELECT 1 FROM discovery_reactions r WHERE r.user_id = ? AND r.listing_id = l.id AND r.reaction = 'pass')");
+    params.push(viewerId);
+  }
+  if (excluded.length) {
+    where.push(`l.id NOT IN (${excluded.map(() => '?').join(',')})`);
+    params.push(...excluded);
+  }
+  const base = where.join(' AND ');
+  const total = db.prepare(`SELECT COUNT(*) AS n FROM listings l WHERE ${base}`).get(...params).n;
+  const interests = viewer ? db.prepare(`SELECT l.category, COUNT(*) AS score
+    FROM favorites f JOIN listings l ON l.id = f.listing_id
+    WHERE f.user_id = ? GROUP BY l.category ORDER BY score DESC, l.category`).all(viewerId) : [];
+  const select = (condition, extraParams = [], order = 'l.created_at DESC, l.id DESC') => db.prepare(
+    `${LISTING_SELECT} WHERE ${base}${condition} ORDER BY ${order} LIMIT ?`
+  ).all(viewerId, ...params, ...extraParams, limit);
+  let rows;
+  if (!interests.length) {
+    rows = select('');
+  } else {
+    const categories = interests.map((i) => i.category);
+    const inCategories = `(${categories.map(() => '?').join(',')})`;
+    // Three matching cards followed by one different category keeps discovery varied.
+    const preferred = select(` AND l.category IN ${inCategories}`, categories,
+      `(SELECT COUNT(*) FROM favorites f JOIN listings saved ON saved.id = f.listing_id WHERE f.user_id = ${viewerId} AND saved.category = l.category) DESC, l.created_at DESC, l.id DESC`);
+    const explore = select(` AND l.category NOT IN ${inCategories}`, categories);
+    rows = [];
+    let pi = 0, ei = 0;
+    while (rows.length < limit && (pi < preferred.length || ei < explore.length)) {
+      if (ei < explore.length && (rows.length % 4 === 3 || pi >= preferred.length)) rows.push(explore[ei++]);
+      else rows.push(preferred[pi++]);
+    }
+  }
+  const scores = new Set(interests.map((i) => i.category));
+  return {
+    items: rows.map((row) => ({ ...shape(row), reason: scores.has(row.category)
+      ? `Because you saved ${row.category}` : interests.length ? 'Explore something different' : 'Fresh on SduSell' })),
+    has_more: total > rows.length,
+    personalized: interests.length > 0,
+  };
+}
+
 function insertImages(listingId, urls) {
   const ins = db.prepare('INSERT INTO images (listing_id, url, position) VALUES (?, ?, ?)');
   urls.forEach((u, i) => ins.run(listingId, u, i));
@@ -272,6 +326,27 @@ route('PUT', '/api/auth/me', async (req) => {
 });
 
 route('GET', '/api/listings', (req, _p, url) => listListings(url, auth.getUserFromToken(bearer(req))));
+
+route('GET', '/api/discovery', (req, _p, url) => discoveryListings(url, auth.getUserFromToken(bearer(req))));
+
+route('POST', '/api/discovery/:id/reaction', async (req, p) => {
+  const user = requireUser(req);
+  const b = await readJson(req);
+  if (!b || (b.reaction !== 'like' && b.reaction !== 'pass')) throw new HttpError(400, 'Reaction must be like or pass');
+  const id = Number(p.id);
+  if (!Number.isSafeInteger(id) || id < 1) throw new HttpError(404, 'Listing not found');
+  const listing = db.prepare("SELECT user_id FROM listings WHERE id = ? AND status = 'active'").get(id);
+  if (!listing) throw new HttpError(404, 'Listing not found');
+  if (listing.user_id === user.id) throw new HttpError(403, 'You cannot react to your own listing');
+  db.exec('BEGIN');
+  try {
+    db.prepare(`INSERT INTO discovery_reactions (user_id, listing_id, reaction) VALUES (?, ?, ?)
+      ON CONFLICT(user_id, listing_id) DO UPDATE SET reaction = excluded.reaction`).run(user.id, id, b.reaction);
+    if (b.reaction === 'like') db.prepare('INSERT OR IGNORE INTO favorites (user_id, listing_id) VALUES (?, ?)').run(user.id, id);
+    db.exec('COMMIT');
+  } catch (err) { db.exec('ROLLBACK'); throw err; }
+  return { ok: true, reaction: b.reaction, favorited: !!db.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND listing_id = ?').get(user.id, id) };
+});
 
 route('GET', '/api/listings/:id', (req, p) => {
   const viewer = auth.getUserFromToken(bearer(req));

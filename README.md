@@ -17,7 +17,7 @@ Demo login after seeding: `demo@sdusell.kz` / `password123`.
 Other commands:
 
 ```bash
-npm test                              # 10 API tests, use a throwaway database
+npm test                              # 10 discovery API tests, use a throwaway database
 node server/seed.js --reset           # wipe everything and reseed
 PORT=8080 npm start                   # change the port
 ```
@@ -30,6 +30,7 @@ PORT=8080 npm start                   # change the port
 - Browse with search (works for Russian and English), category, city, price range, condition and sort
 - Listing page with gallery, "Show phone number", WhatsApp link, seller info and view count
 - Favorites and a "My listings" page
+- SDU Finds (`/#/discover`): swipeable discovery cards, saved interests, persistent hidden listings and explained recommendations
 - Works on phones; keyboard focus is visible; reduced motion is respected
 
 ## Project layout
@@ -56,6 +57,8 @@ Send `Authorization: Bearer <token>` for the routes marked with a lock. All bodi
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET | `/api/meta` | categories and cities |
+| GET | `/api/discovery` | optional auth; `limit` (1–50), `exclude` (up to 100 IDs); returns `items` with `reason`, `has_more`, `personalized` |
+| POST | `/api/discovery/:id/reaction` | 🔒 `{ "reaction": "like" \| "pass" }`; like adds to Favorites, pass hides the listing |
 | POST | `/api/auth/register` | `name, email, password (8+), phone?, city?` returns `token, user` |
 | POST | `/api/auth/login` | `email, password` returns `token, user` |
 | POST | `/api/auth/logout` | 🔒 |
@@ -97,3 +100,9 @@ This is a solid course project, not a production service. Things to add first:
 - Chat between buyer and seller instead of phone and WhatsApp only
 - Profile page where users edit their name, phone and city (the API already has `PUT /api/auth/me`)
 - Promoted listings, saved searches, listing expiry after 30 days
+
+## SDU Finds
+
+Open `http://localhost:3000/#/discover`. Save a listing to influence recommendations; use “Not for me” to hide it. Guests can browse without logging in. A collection ends after the available listings or 100 cards.
+
+The rule-based algorithm prioritizes favorite categories and mixes in other categories. It excludes sold, owned, saved and hidden listings. Preferences persist in SQLite; ordinary skips only last for the current collection.
