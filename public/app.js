@@ -96,13 +96,13 @@ async function api(path, { method = 'GET', body } = {}) {
 
 // ---------- categories ----------
 const CAT_STYLE = {
-  'Electronics': { emoji: '📱', bg: '#DDF1F7', fg: '#00657D' },
-  'Transport': { emoji: '🚗', bg: '#E4EEF9', fg: '#2A5DA8' },
+  'Electronics': { emoji: '📱', bg: '#E4ECFF', fg: '#2B4F9B' },
+  'Transport': { emoji: '🚗', bg: '#E8EDF9', fg: '#334D7B' },
   'Fashion': { emoji: '👕', bg: '#F7E6EE', fg: '#A33A6B' },
-  'Home & Garden': { emoji: '🛋️', bg: '#E3F2E6', fg: '#2D7A45' },
+  'Home & Garden': { emoji: '🛋️', bg: '#E8EFF4', fg: '#46647E' },
   'Kids': { emoji: '🧸', bg: '#FFF1CC', fg: '#8F6400' },
   'Sports & Hobbies': { emoji: '🚴', bg: '#E9E6F7', fg: '#5B47A8' },
-  'Books & Study': { emoji: '📚', bg: '#DFF0EE', fg: '#1F7A70' },
+  'Books & Study': { emoji: '📚', bg: '#E6ECFA', fg: '#37578C' },
   'Services': { emoji: '🛠️', bg: '#FDE9DD', fg: '#B2531F' },
   'Other': { emoji: '📦', bg: '#E8EDF0', fg: '#4A636F' },
 };
@@ -432,18 +432,18 @@ async function viewHome(params) {
   $q.value = f.q;
   const hero = isBrowse ? h('section', { class: 'home-hero', 'aria-labelledby': 'hero-heading' },
     h('div', { class: 'hero-copy' },
-      h('span', { class: 'eyebrow' }, 'The student marketplace'),
-      h('h1', { id: 'hero-heading' }, 'Good finds.', h('br'), h('em', {}, 'Better prices.')),
-      h('p', { class: 'hero-description' }, 'A new home for your old favourites. Buy, sell and discover a little more around campus.'),
+      h('span', { class: 'eyebrow' }, 'The SDU student community'),
+      h('h1', { id: 'hero-heading' }, 'Your campus.', h('br'), h('em', {}, 'Your next find.')),
+      h('p', { class: 'hero-description' }, 'From your first textbook to your next upgrade. Buy, sell and find something good around SDU.'),
       h('div', { class: 'hero-actions' },
         h('a', { class: 'btn btn-primary', href: '#/discover' }, 'Explore finds', h('span', { 'aria-hidden': 'true' }, '↗')),
         h('a', { class: 'btn btn-quiet', href: '#/sell' }, 'Sell something')),
-      h('p', { class: 'hero-note' }, 'Made for students. Open to good finds.')),
+      h('p', { class: 'hero-note' }, 'SDU spirit. Student-to-student.')),
     h('div', { class: 'hero-visual', 'aria-hidden': 'true' },
       h('div', { class: 'hero-tile hero-tile-laptop' }, artwork('Electronics'), h('span', { class: 'hero-tile-label' }, 'Upgrade your everyday')),
       h('div', { class: 'hero-tile hero-tile-audio' }, artwork('Audio'), h('span', { class: 'hero-tile-label' }, 'Find your next favourite')),
       h('div', { class: 'hero-tile hero-tile-books' }, artwork('Books & Study'), h('span', { class: 'hero-tile-label' }, 'Pass it on')),
-      h('span', { class: 'hero-sticker' }, 'Good stuff.', h('br'), 'Second stories.'))) : null;
+      h('span', { class: 'hero-sticker' }, 'Campus life.', h('br'), 'Second stories.'))) : null;
   return h('div', { class: 'page home-page' }, hero,
     h('div', { class: 'market-section-label' }, h('h2', {}, 'Find your thing'), h('span', {}, 'A little bit of everything.')),
     chips, h('div', { class: 'home-layout' }, filters, results));
