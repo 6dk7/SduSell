@@ -558,29 +558,6 @@ dialog::backdrop { background: rgba(18, 38, 46, 0.55); }
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2369746E' stroke-width='1.5'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
   background-position: right 10px center; background-repeat: no-repeat;
 }
-/* Official SDU lockup, paired with the student marketplace identity. */
-.logo { gap: 12px; }
-.sdu-logo { display: block; width: 110px; height: auto; flex: none; }
-.logo-divider { height: 32px; width: 1px; background: var(--line); flex: none; }
-.logo-wordmark { display: flex; flex-direction: column; gap: 1px; }
-.logo-caption { font-size: 9px; color: var(--ink-2); letter-spacing: .04em; white-space: nowrap; }
-.footer-sdu-logo { display: block; width: 100px; height: auto; margin-bottom: 12px; }
-@media (max-width: 1100px) { .sdu-logo { width: 92px; } .search { margin-left: 0; } }
-@media (max-width: 720px) {
-  .logo { gap: 9px; }
-  .sdu-logo { width: 80px; }
-  .logo-text { font-size: 20px; }
-  .logo-caption { font-size: 8px; }
-}
-@media (max-width: 560px) {
-  .sdu-logo { width: 70px; }
-  .logo-divider { height: 25px; }
-  .logo { gap: 8px; }
-  .logo-text { font-size: 18px; }
-  .logo-caption { display: none; }
-}
-@media (max-width: 360px) {
-  .sdu-logo { width: 60px; }
-  .logo { gap: 7px; }
-  .logo-text { font-size: 16px; }
-}
+
+.footer-logo { display: inline-flex; align-items: center; gap: 8px; }
+.footer-logo-mark { display: block; width: 28px; height: 28px; flex: none; }
