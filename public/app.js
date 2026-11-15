@@ -108,26 +108,39 @@ const CAT_STYLE = {
 };
 const catStyle = (c) => CAT_STYLE[c] || CAT_STYLE.Other;
 
-// Placeholder for listings without photos: category colour + ram's-horn ornament pattern.
+// Decorative illustrations are category artwork, never listing photographs.
+const PRODUCT_ART = {
+  Electronics: `<ellipse cx="120" cy="151" rx="86" ry="9" fill="currentColor" opacity=".08"/><rect x="53" y="33" width="134" height="94" rx="10" fill="#fff" stroke="currentColor" stroke-width="4"/><rect x="62" y="42" width="116" height="76" rx="4" fill="currentColor" opacity=".09"/><path d="M32 130h176l-17 16H49z" fill="#fff" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M98 131h44l-4 5h-36z" fill="currentColor" opacity=".3"/><path d="m102 68-15 13 15 13m36-26 15 13-15 13m-12-30-12 34" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`,
+  Audio: `<ellipse cx="120" cy="153" rx="66" ry="8" fill="currentColor" opacity=".08"/><path d="M65 101V79a55 55 0 0 1 110 0v22" fill="none" stroke="currentColor" stroke-width="15"/><path d="M66 101V79a54 54 0 0 1 108 0" fill="none" stroke="#fff" stroke-width="5" opacity=".55"/><rect x="51" y="87" width="34" height="57" rx="15" fill="#fff" stroke="currentColor" stroke-width="4"/><rect x="155" y="87" width="34" height="57" rx="15" fill="#fff" stroke="currentColor" stroke-width="4"/><path d="M76 97v36m88-36v36" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".4"/>`,
+  'Books & Study': `<ellipse cx="120" cy="151" rx="80" ry="8" fill="currentColor" opacity=".08"/><path d="m47 120 105-22 40 22-105 25z" fill="currentColor" opacity=".2"/><path d="M48 119v14l39 20 105-25v-14" fill="#fff" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="m47 119 105-25 40 20-105 25z" fill="currentColor" opacity=".6"/><path d="M53 89v15l42 19 91-23V85" fill="#fff" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="m53 89 92-23 41 19-91 23z" fill="currentColor" opacity=".25"/><path d="M65 61v14l42 19 78-20V60" fill="#fff" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="m65 61 78-20 42 19-78 20z" fill="currentColor" opacity=".8"/><path d="m115 56 27-7 15 7-27 7" fill="#fff" opacity=".8"/>`,
+  Fashion: `<ellipse cx="120" cy="155" rx="69" ry="7" fill="currentColor" opacity=".08"/><path d="m88 34-33 22-18 46 28 13 14-27v59h82V88l14 27 28-13-18-46-33-22-18 13h-28z" fill="#fff" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M97 36q23 37 46 0M107 57v28m26-28v28m-35 24h44v20H98z" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M82 141h76" stroke="currentColor" stroke-width="8" opacity=".15"/>`,
+  Transport: `<ellipse cx="120" cy="146" rx="89" ry="8" fill="currentColor" opacity=".08"/><path d="m40 102 16-13 21-37h81l27 38 18 12v27H37v-22z" fill="#fff" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M85 60h28v29H68zm39 0h28l20 29h-48z" fill="currentColor" opacity=".2"/><circle cx="72" cy="129" r="16" fill="#fff" stroke="currentColor" stroke-width="5"/><circle cx="169" cy="129" r="16" fill="#fff" stroke="currentColor" stroke-width="5"/><path d="M42 106h17m126 0h13m-85-7h14" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>`,
+  'Home & Garden': `<ellipse cx="120" cy="153" rx="73" ry="8" fill="currentColor" opacity=".08"/><rect x="68" y="33" width="104" height="82" rx="25" fill="#fff" stroke="currentColor" stroke-width="4"/><rect x="57" y="85" width="126" height="50" rx="13" fill="#fff" stroke="currentColor" stroke-width="4"/><path d="M73 136v17m94-17v17m-81-46h68" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><rect x="75" y="42" width="90" height="36" rx="17" fill="currentColor" opacity=".1"/>`,
+  'Sports & Hobbies': `<circle cx="63" cy="119" r="32" fill="#fff" stroke="currentColor" stroke-width="4"/><circle cx="181" cy="119" r="32" fill="#fff" stroke="currentColor" stroke-width="4"/><path d="m63 119 35-58 24 58H63l75-47h27l16 47M91 56h23m45 16-9-22h-17" fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="122" cy="119" r="8" fill="currentColor"/>`,
+  Kids: `<ellipse cx="120" cy="153" rx="75" ry="8" fill="currentColor" opacity=".08"/><rect x="49" y="96" width="68" height="50" rx="8" fill="#fff" stroke="currentColor" stroke-width="4"/><rect x="123" y="96" width="68" height="50" rx="8" fill="currentColor" opacity=".22" stroke="currentColor" stroke-width="4"/><rect x="85" y="39" width="68" height="50" rx="8" fill="#fff" stroke="currentColor" stroke-width="4"/><path d="m104 73 15-21 15 21m-26-6h22" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><circle cx="82" cy="121" r="12" fill="currentColor" opacity=".25"/><path d="m144 131 13-20 13 20z" fill="currentColor" opacity=".6"/>`,
+  Services: `<ellipse cx="120" cy="154" rx="66" ry="8" fill="currentColor" opacity=".08"/><path d="M151 32a35 35 0 0 0-40 45l-55 55a13 13 0 0 0 18 18l55-55a35 35 0 0 0 45-40l-22 21-21-21z" fill="#fff" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><circle cx="67" cy="139" r="4" fill="currentColor"/>`,
+  Other: `<path d="m50 65 70-31 70 31v73l-70 27-70-27z" fill="#fff" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="m50 65 70 30 70-30m-70 30v70M85 49l70 30v29l-16 6V85" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="m65 121 31 12" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".3"/>`,
+};
+const CATEGORY_ICON = {
+  Electronics: '<rect x="4" y="4" width="16" height="12" rx="2"/><path d="M2 20h20M9 16v4m6-4v4"/>',
+  Transport: '<path d="m4 9 3-5h10l3 5M3 9h18v9H3z"/><path d="M6 18v2m12-2v2M6 13h2m8 0h2"/>',
+  Fashion: '<path d="m8 3-6 4 3 6 3-2v10h8V11l3 2 3-6-6-4c0 4-8 4-8 0Z"/>',
+  'Home & Garden': '<path d="M5 11V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v6M3 11h18v8H3zm3 8v2m12-2v2M6 11v4m12-4v4"/>',
+  Kids: '<path d="M3 12h9v9H3zM12 12h9v9h-9zM8 3h9v9H8z"/>',
+  'Sports & Hobbies': '<circle cx="6" cy="16" r="4"/><circle cx="18" cy="16" r="4"/><path d="m6 16 4-10 4 10H6l10-7h2m-4-5h3l1 5m-10-3h4"/>',
+  'Books & Study': '<path d="M12 5C8 2 4 3 2 4v15c4-2 7-1 10 1 3-2 6-3 10-1V4c-2-1-6-2-10 1Zm0 0v15"/>',
+  Services: '<path d="M20 3a6 6 0 0 0-8 8l-8 8a2 2 0 0 0 3 3l8-8a6 6 0 0 0 8-8l-4 4-4-4z"/>',
+  Other: '<path d="m3 6 9-4 9 4v12l-9 4-9-4zm0 0 9 4 9-4m-9 4v12M8 4l9 4"/>',
+};
+function artwork(type, className = 'product-art') {
+  const holder = document.createElement('span');
+  holder.innerHTML = `<svg class="${className}" viewBox="0 0 ${className === 'category-icon' ? '24 24' : '240 180'}" fill="${className === 'category-icon' ? 'none' : 'currentColor'}" stroke="${className === 'category-icon' ? 'currentColor' : 'none'}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${className === 'category-icon' ? CATEGORY_ICON[type] || CATEGORY_ICON.Other : PRODUCT_ART[type] || PRODUCT_ART.Other}</svg>`;
+  return holder.firstElementChild;
+}
 function placeholder(category) {
   const s = catStyle(category);
-  const id = `orn-${Object.keys(CAT_STYLE).indexOf(category) + 1}`;
-  const wrap = h('div', { class: 'ph', style: `--ph-bg:${s.bg};--ph-fg:${s.fg}`, 'aria-hidden': 'true' });
-  wrap.innerHTML = `
-    <svg class="ph-pattern" xmlns="http://www.w3.org/2000/svg" focusable="false">
-      <defs>
-        <pattern id="${id}" width="48" height="48" patternUnits="userSpaceOnUse">
-          <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M23 10C14 6 6 12 8 21C10 29 21 28 21 21C21 16 15 16 15 20"/>
-            <path d="M23 10C14 6 6 12 8 21C10 29 21 28 21 21C21 16 15 16 15 20" transform="translate(48 0) scale(-1 1)"/>
-            <path d="M24 34l4 4-4 4-4-4z"/>
-          </g>
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#${id})"/>
-    </svg>
-    <span class="ph-emoji">${s.emoji}</span>`;
-  return wrap;
+  return h('div', { class: 'ph', style: `--ph-bg:${s.bg};--ph-fg:${s.fg}` },
+    artwork(category), h('span', { class: 'ph-label' }, 'No photo'));
 }
 
 const HEART = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.2C1.5 8 3.4 4.8 6.6 4.8c1.9 0 3.5 1 4.4 2.6.2.3.8.3 1 0 .9-1.6 2.5-2.6 4.4-2.6 3.2 0 5.1 3.2 3.9 6.5-1.8 4.6-9.3 9.2-9.3 9.2z" stroke-width="1.8" stroke-linejoin="round"/></svg>';
@@ -144,8 +157,8 @@ function setSession(token, user) {
 }
 
 function renderActions() {
-  $actions.replaceChildren(h('a', { class: 'discover-link', href: '#/discover' }, '✦ Finds'));
-  const sell = h('a', { class: 'btn btn-sun', href: '#/sell' }, 'Post a listing');
+  $actions.replaceChildren(h('a', { class: 'discover-link', href: '#/discover' }, 'Finds'));
+  const sell = h('a', { class: 'btn btn-sun', href: '#/sell' }, '+ Sell');
   if (!state.user) {
     $actions.append(
       h('button', { class: 'link-btn', type: 'button', onclick: () => openAuth('login') }, 'Log in'),
@@ -305,7 +318,7 @@ function card(l, opts = {}) {
     h('div', { class: 'card-top' },
       h('a', { class: 'card-media', href, tabindex: '-1', 'aria-hidden': 'true' },
         l.cover ? h('img', { src: l.cover, alt: '', loading: 'lazy' }) : placeholder(l.category),
-        l.status === 'sold' ? h('span', { class: 'badge badge-sold' }, 'Sold') : null,
+        l.status === 'sold' ? h('span', { class: 'badge badge-sold' }, 'Sold') : h('span', { class: 'card-condition' }, l.condition === 'new' ? 'New' : 'Pre-loved'),
       ),
       favToggle(l, { onChange: opts.onFavChange ? (v) => opts.onFavChange(v, l) : undefined }),
     ),
@@ -348,6 +361,7 @@ function filtersToHash(f, page = 1) {
 
 async function viewHome(params) {
   const f = readFilters(params);
+  const isBrowse = FILTER_KEYS.every(k => !f[k]) && f.page === 1;
   const api_q = new URLSearchParams({ limit: 24, page: f.page });
   for (const k of FILTER_KEYS) if (f[k]) api_q.set(k, f[k]);
   const data = await api(`/listings?${api_q}`);
@@ -359,7 +373,7 @@ async function viewHome(params) {
     h('a', { class: 'chip', href: filtersToHash({ ...f, category: '' }), 'aria-current': String(!f.category) }, 'All'),
     state.meta.categories.map((c) =>
       h('a', { class: 'chip', href: filtersToHash({ ...f, category: c }), 'aria-current': String(f.category === c) },
-        h('span', { 'aria-hidden': 'true' }, catStyle(c).emoji), c)),
+        artwork(c, 'category-icon'), c)),
   );
 
   // filters
@@ -401,7 +415,7 @@ async function viewHome(params) {
   const grid = h('div', { class: 'grid' }, data.items.map((l) => card(l)));
   const results = h('section', { class: 'results', 'aria-labelledby': 'results-h' },
     h('div', { class: 'results-head' },
-      h('h1', { id: 'results-h' }, heading),
+      h(isBrowse ? 'h2' : 'h1', { id: 'results-h' }, heading),
       h('p', { class: 'muted' }, data.total === 1 ? '1 listing' : `${nf.format(data.total)} listings`),
     ),
     data.items.length
@@ -416,12 +430,23 @@ async function viewHome(params) {
   );
 
   $q.value = f.q;
-  const discover = h('a', { class: 'discovery-banner', href: '#/discover' },
-    h('div', {}, h('span', { class: 'eyebrow' }, 'A little curiosity goes a long way'),
-      h('h2', {}, 'Your next great find is one swipe away.'),
-      h('p', {}, 'Explore SDU Finds. Save what you love, skip what you don’t.')),
-    h('span', { class: 'btn btn-sun' }, 'Explore finds ↗'));
-  return h('div', { class: 'page' }, discover, chips, h('div', { class: 'home-layout' }, filters, results));
+  const hero = isBrowse ? h('section', { class: 'home-hero', 'aria-labelledby': 'hero-heading' },
+    h('div', { class: 'hero-copy' },
+      h('span', { class: 'eyebrow' }, 'The student marketplace'),
+      h('h1', { id: 'hero-heading' }, 'Good finds.', h('br'), h('em', {}, 'Better prices.')),
+      h('p', { class: 'hero-description' }, 'A new home for your old favourites. Buy, sell and discover a little more around campus.'),
+      h('div', { class: 'hero-actions' },
+        h('a', { class: 'btn btn-primary', href: '#/discover' }, 'Explore finds', h('span', { 'aria-hidden': 'true' }, '↗')),
+        h('a', { class: 'btn btn-quiet', href: '#/sell' }, 'Sell something')),
+      h('p', { class: 'hero-note' }, 'Made for students. Open to good finds.')),
+    h('div', { class: 'hero-visual', 'aria-hidden': 'true' },
+      h('div', { class: 'hero-tile hero-tile-laptop' }, artwork('Electronics'), h('span', { class: 'hero-tile-label' }, 'Upgrade your everyday')),
+      h('div', { class: 'hero-tile hero-tile-audio' }, artwork('Audio'), h('span', { class: 'hero-tile-label' }, 'Find your next favourite')),
+      h('div', { class: 'hero-tile hero-tile-books' }, artwork('Books & Study'), h('span', { class: 'hero-tile-label' }, 'Pass it on')),
+      h('span', { class: 'hero-sticker' }, 'Good stuff.', h('br'), 'Second stories.'))) : null;
+  return h('div', { class: 'page home-page' }, hero,
+    h('div', { class: 'market-section-label' }, h('h2', {}, 'Find your thing'), h('span', {}, 'A little bit of everything.')),
+    chips, h('div', { class: 'home-layout' }, filters, results));
 }
 
 
@@ -437,15 +462,15 @@ async function viewDiscovery() {
   const counter = h('span', { class: 'muted' });
   const page = h('div', { class: 'page discovery-page' },
     h('div', { class: 'discovery-heading' },
-      h('div', {}, h('span', { class: 'eyebrow' }, 'Less searching. More discovering.'),
+      h('div', {}, h('span', { class: 'eyebrow' }, 'Your daily discovery'),
         h('h1', { class: 'page-title' }, 'SDU Finds'),
-        h('p', { class: 'muted' }, 'A fresh perspective on the marketplace.')),
+        h('p', { class: 'muted' }, 'One good find at a time.')),
       h('a', { class: 'btn btn-quiet', href: '#/' }, 'Browse all ↗')),
     h('div', { class: 'discovery-layout' }, stage,
       h('aside', { class: 'discovery-guide' }, h('span', { class: 'discovery-spark', 'aria-hidden': 'true' }, '✦'),
-        h('h2', {}, 'Good finds, your way.'),
-        h('p', {}, 'Save a find and we’ll show you more from that category. Every fourth recommendation makes room for something different.'),
-        h('ul', {}, h('li', {}, '♡ Save → keep it in Favorites'), h('li', {}, '× Not for me → hide this find'), h('li', {}, '↓ Swipe, scroll or use your keyboard')),
+        h('h2', {}, 'A little more you.'),
+        h('p', {}, 'Save what you love. Your next finds follow your interests, with something different mixed in.'),
+        h('ul', {}, h('li', {}, '♡ Keep the good ones'), h('li', {}, '× Skip what’s not your thing'), h('li', {}, '↓ Scroll for the next find')),
         h('p', { class: 'muted' }, state.user ? 'Your saves and hidden finds are kept with your account.' : 'Explore freely. Log in to save finds and keep your preferences.'))),
     h('div', { class: 'discovery-controls' }, counter, next), status);
 
@@ -466,14 +491,14 @@ async function viewDiscovery() {
       return;
     }
     seen.add(l.id);
-    counter.textContent = `Find ${seen.size} · a little discovery break`;
+    counter.textContent = `Find ${seen.size} · made for your curiosity`;
     status.textContent = `${l.title}. ${money(l.price)}. ${l.reason}`;
     const save = h('button', { class: 'btn discovery-save', type: 'button', onclick: () => react('like') }, '♡ Save find');
     const pass = h('button', { class: 'btn btn-quiet', type: 'button', onclick: () => react('pass') }, '× Not for me');
     stage.replaceChildren(h('article', { class: 'discovery-card' },
       h('a', { class: 'discovery-media', href: `#/listing/${l.id}`, 'aria-label': `View ${l.title}` },
         l.cover ? h('img', { src: l.cover, alt: l.title }) : placeholder(l.category),
-        h('span', { class: 'discovery-category' }, `${catStyle(l.category).emoji} ${l.category}`)),
+        h('span', { class: 'discovery-category' }, l.category)),
       h('div', { class: 'discovery-body' },
         h('p', { class: 'discovery-reason' }, `✦ ${l.reason}`),
         h('div', { class: 'discovery-title-row' }, h('h2', {}, l.title), h('p', { class: 'price price-lg' }, money(l.price))),
