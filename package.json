@@ -1,0 +1,15 @@
+{
+  "name": "sdusell",
+  "version": "1.0.0",
+  "description": "SduSell - a classifieds marketplace (OLX / Facebook Marketplace style) for Kazakhstan",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "seed": "node --disable-warning=ExperimentalWarning server/seed.js",
+    "test": "node --disable-warning=ExperimentalWarning --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "MIT"
+}
