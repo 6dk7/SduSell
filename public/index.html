@@ -13,21 +13,21 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <a class="skip" href="#/" id="skip">Skip to content</a>
+  <a class="skip" href="#/" id="skip" data-i18n="Skip to content">Skip to content</a>
 
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="logo" href="#/" aria-label="SduSell home">
+      <a class="logo" href="#/" aria-label="SduSell home" data-i18n-aria-label="SduSell home">
         <img class="logo-mark" src="/assets/sdusell-mark.svg" alt="" width="40" height="40">
         <span class="logo-text">SduSell</span>
       </a>
 
       <form class="search" id="searchForm" role="search">
-        <input type="search" id="q" name="q" placeholder="Search for your next find…" aria-label="Search listings" autocomplete="off" maxlength="100">
-        <button class="search-btn" type="submit">Search</button>
+        <input type="search" id="q" name="q" placeholder="Search for your next find…" data-i18n-placeholder="Search for your next find…" aria-label="Search listings" data-i18n-aria-label="Search listings" autocomplete="off" maxlength="100">
+        <button class="search-btn" type="submit" data-i18n="Search">Search</button>
       </form>
 
-      <nav class="actions" id="actions" aria-label="Account"></nav>
+      <nav class="actions" id="actions" aria-label="Account" data-i18n-aria-label="Account"></nav>
     </div>
   </header>
 
@@ -35,14 +35,15 @@
 
   <footer class="footer">
     <div class="footer-inner">
-      <div class="footer-brand"><a href="#/" class="footer-logo"><img class="footer-logo-mark" src="/assets/sdusell-mark.svg" alt="" width="28" height="28">SduSell</a><p>Independent student project.</p></div>
-      <p class="footer-note">A student project, made for your community.<br>Meet in a public place and check the item before you pay.</p>
+      <div class="footer-brand"><a href="#/" class="footer-logo"><img class="footer-logo-mark" src="/assets/sdusell-mark.svg" alt="" width="28" height="28">SduSell</a><p data-i18n="Independent student project.">Independent student project.</p></div>
+      <p class="footer-note"><span data-i18n="A student project, made for your community.">A student project, made for your community.</span><br><span data-i18n="Meet in a public place and check the item before you pay.">Meet in a public place and check the item before you pay.</span></p>
     </div>
   </footer>
 
   <dialog id="dialog"></dialog>
   <div id="toast" role="status" aria-live="polite"></div>
 
+  <script src="/i18n.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
