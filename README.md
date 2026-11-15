@@ -28,7 +28,11 @@ PORT=8080 npm start                   # change the port
 - Post, edit, delete a listing; mark it as sold or available again
 - Up to 8 photos per listing, resized in the browser before upload; choose the cover photo
 - Browse with search (works for Russian and English), category, city, price range, condition and sort
+- Switch the interface between Russian, Kazakh and English
 - Listing page with gallery, "Show phone number", WhatsApp link, seller info and view count
+- Publish listings to sell, exchange, give away or request an item; add subject and course details to books
+- Mark listings as active, reserved or sold
+- Browse curated student-life collections and quick categories on the home page
 - Favorites and a "My listings" page
 - SDU Finds (`/#/discover`): swipeable discovery cards, saved interests, persistent hidden listings and explained recommendations
 - Works on phones; keyboard focus is visible; reduced motion is respected
@@ -64,13 +68,13 @@ Send `Authorization: Bearer <token>` for the routes marked with a lock. All bodi
 | POST | `/api/auth/logout` | 🔒 |
 | GET | `/api/auth/me` | 🔒 |
 | PUT | `/api/auth/me` | 🔒 `name, phone, city` |
-| GET | `/api/listings` | query: `q, category, city, min, max, condition, sort, page, limit, seller` |
+| GET | `/api/listings` | query: `q, category` or comma-separated `categories`, `type`, `subject`, `course`, `city, min, max, condition, sort, page, limit, seller` |
 | GET | `/api/listings?mine=1` | 🔒 your listings, including sold |
 | GET | `/api/listings?favorites=1` | 🔒 |
 | GET | `/api/listings/:id` | includes `images` and `seller` |
-| POST | `/api/listings` | 🔒 `title, description, price, category, city, condition, negotiable, images[]` |
-| PUT | `/api/listings/:id` | 🔒 owner only |
-| PATCH | `/api/listings/:id/status` | 🔒 owner only, `{ "status": "sold" \| "active" }` |
+| POST | `/api/listings` | 🔒 `title, description, price, category, city, condition, listing_type, subject?, course?, negotiable, images[]` |
+| PUT | `/api/listings/:id` | 🔒 owner only; accepts the same listing fields |
+| PATCH | `/api/listings/:id/status` | 🔒 owner only, `{ "status": "active" \| "reserved" \| "sold" }` |
 | DELETE | `/api/listings/:id` | 🔒 owner only |
 | POST / DELETE | `/api/listings/:id/favorite` | 🔒 |
 
@@ -106,3 +110,5 @@ This is a solid course project, not a production service. Things to add first:
 Open `http://localhost:3000/#/discover`. Save a listing to influence recommendations; use “Not for me” to hide it. Guests can browse without logging in. A collection ends after the available listings or 100 cards.
 
 The rule-based algorithm prioritizes favorite categories and mixes in other categories. It excludes sold, owned, saved and hidden listings. Preferences persist in SQLite; ordinary skips only last for the current collection.
+
+Listing types are `sell`, `exchange`, `free` and `wanted`; status values are `active`, `reserved` and `sold`. Older databases receive the new optional listing columns in place when the server starts.

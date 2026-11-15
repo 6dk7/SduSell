@@ -36,8 +36,11 @@ CREATE TABLE IF NOT EXISTS listings (
   category    TEXT NOT NULL,
   city        TEXT NOT NULL,
   condition   TEXT NOT NULL DEFAULT 'used',    -- new | used
+  listing_type TEXT NOT NULL DEFAULT 'sell',   -- sell | exchange | free | wanted
+  subject     TEXT,
+  course      TEXT,
   negotiable  INTEGER NOT NULL DEFAULT 0,
-  status      TEXT NOT NULL DEFAULT 'active',  -- active | sold
+  status      TEXT NOT NULL DEFAULT 'active',  -- active | reserved | sold
   views       INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -68,6 +71,13 @@ CREATE INDEX IF NOT EXISTS idx_listings_user     ON listings(user_id);
 CREATE INDEX IF NOT EXISTS idx_images_listing    ON images(listing_id);
 `);
 
+// CREATE TABLE IF NOT EXISTS does not add columns to databases created by older versions.
+// Add optional fields in place and preserve existing user data.
+const listingColumns = new Set(db.prepare('PRAGMA table_info(listings)').all().map((column) => column.name));
+if (!listingColumns.has('listing_type')) db.exec("ALTER TABLE listings ADD COLUMN listing_type TEXT NOT NULL DEFAULT 'sell'");
+if (!listingColumns.has('subject')) db.exec('ALTER TABLE listings ADD COLUMN subject TEXT');
+if (!listingColumns.has('course')) db.exec('ALTER TABLE listings ADD COLUMN course TEXT');
+
 const CATEGORIES = [
   'Electronics', 'Transport', 'Fashion', 'Home & Garden',
   'Kids', 'Sports & Hobbies', 'Books & Study', 'Services', 'Other',
@@ -80,4 +90,6 @@ const CITIES = [
   'Kaskelen',
 ];
 
-module.exports = { db, DATA_DIR, CATEGORIES, CITIES };
+const LISTING_TYPES = ['sell', 'exchange', 'free', 'wanted'];
+
+module.exports = { db, DATA_DIR, CATEGORIES, CITIES, LISTING_TYPES };

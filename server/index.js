@@ -4,7 +4,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { db, DATA_DIR, CATEGORIES, CITIES } = require('./db');
+const { db, DATA_DIR, CATEGORIES, CITIES, LISTING_TYPES } = require('./db');
 const auth = require('./auth');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -120,22 +120,31 @@ function deleteUploadFiles(urls) {
 }
 
 // ---------- listings ----------
-function validateListing(b) {
+function validateListing(b, existing = null) {
   const title = str(b.title, 100);
   const description = str(b.description, 4000);
   const price = Number(b.price);
   const category = str(b.category, 50);
   const city = str(b.city, 50);
   const condition = b.condition === 'new' ? 'new' : 'used';
+  const listingType = b.listing_type === undefined ? (existing?.listing_type || 'sell') : str(b.listing_type, 20);
+  const subject = category === 'Books & Study'
+    ? (b.subject === undefined && existing ? existing.subject : str(b.subject, 100)) || null
+    : null;
+  const course = category === 'Books & Study'
+    ? (b.course === undefined && existing ? existing.course : str(b.course, 80)) || null
+    : null;
   if (title.length < 3) throw new HttpError(400, 'Title must be at least 3 characters');
   if (!Number.isInteger(price) || price < 0 || price > 10_000_000_000) throw new HttpError(400, 'Price must be a whole number in tenge');
   if (!CATEGORIES.includes(category)) throw new HttpError(400, 'Unknown category');
   if (!CITIES.includes(city)) throw new HttpError(400, 'Unknown city');
-  return { title, description, price, category, city, condition, negotiable: b.negotiable ? 1 : 0 };
+  if (!LISTING_TYPES.includes(listingType)) throw new HttpError(400, 'Unknown listing type');
+  if (listingType === 'free' && price !== 0) throw new HttpError(400, 'Free listings must have a price of 0');
+  return { title, description, price, category, city, condition, listingType, subject, course, negotiable: b.negotiable ? 1 : 0 };
 }
 
 const LISTING_SELECT = `
-  SELECT l.id, l.title, l.description, l.price, l.category, l.city, l.condition, l.negotiable,
+  SELECT l.id, l.title, l.description, l.price, l.category, l.city, l.condition, l.listing_type, l.subject, l.course, l.negotiable,
          l.status, l.views, l.created_at, l.user_id,
          u.name AS seller_name,
          (SELECT url FROM images WHERE listing_id = l.id ORDER BY position LIMIT 1) AS cover,
@@ -155,7 +164,7 @@ function listListings(url, viewer) {
     if (!viewer) throw new HttpError(401, 'Please log in');
     where.push('l.user_id = ?'); params.push(viewer.id);
   } else {
-    where.push("l.status = 'active'");
+    where.push("l.status IN ('active', 'reserved')");
     if (p.get('seller')) { where.push('l.user_id = ?'); params.push(Number(p.get('seller')) || 0); }
   }
   if (p.get('favorites') === '1') {
@@ -170,7 +179,22 @@ function listListings(url, viewer) {
       params.push(`%${word.replace(/[\\%_]/g, '\\$&')}%`);
     }
   }
-  if (p.get('category')) { where.push('l.category = ?'); params.push(p.get('category')); }
+  const categories = [...new Set([...(p.get('categories') || '').split(',').filter(Boolean), ...(p.get('category') ? [p.get('category')] : [])])];
+  if (categories.some((category) => !CATEGORIES.includes(category))) throw new HttpError(400, 'Unknown category');
+  if (categories.length === 1) { where.push('l.category = ?'); params.push(categories[0]); }
+  else if (categories.length > 1) { where.push(`l.category IN (${categories.map(() => '?').join(',')})`); params.push(...categories); }
+  if (p.get('type')) {
+    if (!LISTING_TYPES.includes(p.get('type'))) throw new HttpError(400, 'Unknown listing type');
+    where.push('l.listing_type = ?'); params.push(p.get('type'));
+  }
+  if (p.get('subject')) {
+    const bookQuery = str(p.get('subject'), 100);
+    // search_text is lowercased in JavaScript, so this also works for Cyrillic/Kazakh.
+    const pattern = `%${bookQuery.toLowerCase().replace(/[\\%_]/g, '\\$&')}%`;
+    where.push("l.search_text LIKE ? ESCAPE '\\'");
+    params.push(pattern);
+  }
+  if (p.get('course')) { where.push('l.course = ?'); params.push(str(p.get('course'), 80)); }
   if (p.get('city')) { where.push('l.city = ?'); params.push(p.get('city')); }
   if (p.get('condition') === 'new' || p.get('condition') === 'used') { where.push('l.condition = ?'); params.push(p.get('condition')); }
   if (p.get('min') !== null && p.get('min') !== '' && Number.isFinite(Number(p.get('min')))) { where.push('l.price >= ?'); params.push(Number(p.get('min'))); }
@@ -198,11 +222,11 @@ function getListing(id, viewer) {
   const row = db.prepare(`${LISTING_SELECT} WHERE l.id = ?`).get(viewer ? viewer.id : 0, id);
   if (!row) throw new HttpError(404, 'Listing not found');
   const isOwner = viewer && viewer.id === row.user_id;
-  if (row.status !== 'active' && !isOwner) throw new HttpError(404, 'Listing not found');
+  if (row.status === 'sold' && !isOwner) throw new HttpError(404, 'Listing not found');
   const images = db.prepare('SELECT url FROM images WHERE listing_id = ? ORDER BY position').all(id).map((i) => i.url);
   const seller = db.prepare('SELECT id, name, phone, city, created_at FROM users WHERE id = ?').get(row.user_id);
   const activeCount = db.prepare("SELECT COUNT(*) AS n FROM listings WHERE user_id = ? AND status = 'active'").get(row.user_id).n;
-  return { ...shape(row), images, seller: { ...seller, active_listings: activeCount } };
+  return { ...shape(row), images, seller: { ...seller, phone: row.status === 'reserved' && !isOwner ? '' : seller.phone, active_listings: activeCount } };
 }
 
 function discoveryListings(url, viewer) {
@@ -212,7 +236,7 @@ function discoveryListings(url, viewer) {
     throw new HttpError(400, 'Exclude must contain at most 100 listing IDs');
   }
   const viewerId = viewer ? viewer.id : 0;
-  const where = ["l.status = 'active'"];
+  const where = ["l.status = 'active'", "l.listing_type != 'wanted'"];
   const params = [];
   if (viewer) {
     where.push('l.user_id != ?'); params.push(viewerId);
@@ -335,7 +359,7 @@ route('POST', '/api/discovery/:id/reaction', async (req, p) => {
   if (!b || (b.reaction !== 'like' && b.reaction !== 'pass')) throw new HttpError(400, 'Reaction must be like or pass');
   const id = Number(p.id);
   if (!Number.isSafeInteger(id) || id < 1) throw new HttpError(404, 'Listing not found');
-  const listing = db.prepare("SELECT user_id FROM listings WHERE id = ? AND status = 'active'").get(id);
+  const listing = db.prepare("SELECT user_id FROM listings WHERE id = ? AND status = 'active' AND listing_type != 'wanted'").get(id);
   if (!listing) throw new HttpError(404, 'Listing not found');
   if (listing.user_id === user.id) throw new HttpError(403, 'You cannot react to your own listing');
   db.exec('BEGIN');
@@ -360,9 +384,9 @@ route('POST', '/api/listings', async (req) => {
   const b = await readJson(req);
   const v = validateListing(b);
   const urls = resolveImages(b.images);
-  const info = db.prepare(`INSERT INTO listings (user_id, title, description, search_text, price, category, city, condition, negotiable)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(user.id, v.title, v.description, `${v.title} ${v.description}`.toLowerCase(), v.price, v.category, v.city, v.condition, v.negotiable);
+  const info = db.prepare(`INSERT INTO listings (user_id, title, description, search_text, price, category, city, condition, listing_type, subject, course, negotiable)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(user.id, v.title, v.description, [v.title, v.description, v.subject, v.course].filter(Boolean).join(' ').toLowerCase(), v.price, v.category, v.city, v.condition, v.listingType, v.subject, v.course, v.negotiable);
   const id = Number(info.lastInsertRowid);
   insertImages(id, urls);
   return { status: 201, body: getListing(id, user) };
@@ -371,13 +395,13 @@ route('POST', '/api/listings', async (req) => {
 route('PUT', '/api/listings/:id', async (req, p) => {
   const user = requireUser(req);
   const id = Number(p.id);
-  ownedListing(id, user);
+  const existing = ownedListing(id, user);
   const b = await readJson(req);
-  const v = validateListing(b);
+  const v = validateListing(b, existing);
   const newUrls = resolveImages(b.images);
   const oldUrls = db.prepare('SELECT url FROM images WHERE listing_id = ?').all(id).map((i) => i.url);
-  db.prepare(`UPDATE listings SET title=?, description=?, search_text=?, price=?, category=?, city=?, condition=?, negotiable=? WHERE id=?`)
-    .run(v.title, v.description, `${v.title} ${v.description}`.toLowerCase(), v.price, v.category, v.city, v.condition, v.negotiable, id);
+  db.prepare(`UPDATE listings SET title=?, description=?, search_text=?, price=?, category=?, city=?, condition=?, listing_type=?, subject=?, course=?, negotiable=? WHERE id=?`)
+    .run(v.title, v.description, [v.title, v.description, v.subject, v.course].filter(Boolean).join(' ').toLowerCase(), v.price, v.category, v.city, v.condition, v.listingType, v.subject, v.course, v.negotiable, id);
   db.prepare('DELETE FROM images WHERE listing_id = ?').run(id);
   insertImages(id, newUrls);
   deleteUploadFiles(oldUrls.filter((u) => !newUrls.includes(u)));
@@ -389,7 +413,7 @@ route('PATCH', '/api/listings/:id/status', async (req, p) => {
   const id = Number(p.id);
   ownedListing(id, user);
   const b = await readJson(req);
-  if (b.status !== 'active' && b.status !== 'sold') throw new HttpError(400, 'Status must be active or sold');
+  if (!['active', 'reserved', 'sold'].includes(b.status)) throw new HttpError(400, 'Status must be active, reserved or sold');
   db.prepare('UPDATE listings SET status = ? WHERE id = ?').run(b.status, id);
   return getListing(id, user);
 });

@@ -13,6 +13,9 @@ const state = {
   user: null,
   meta: { categories: [], cities: [] },
 };
+const t = (value) => window.sduT ? window.sduT(value) : value;
+const localeTag = () => ({ en: 'en-US', ru: 'ru-RU', kk: 'kk-KZ' }[window.sduLocale?.()] || 'en-US');
+let nf = new Intl.NumberFormat(localeTag());
 
 // ---------- small helpers ----------
 function h(tag, attrs, ...kids) {
@@ -22,32 +25,129 @@ function h(tag, attrs, ...kids) {
     if (k === 'class') el.className = v;
     else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
     else if (v === true) el.setAttribute(k, '');
+    else if (['aria-label', 'aria-description', 'placeholder', 'title'].includes(k)) el.setAttribute(k, t(String(v)));
     else el.setAttribute(k, v);
   }
   for (const kid of kids.flat(Infinity)) {
     if (kid == null || kid === false) continue;
-    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+    el.append(kid.nodeType ? kid : document.createTextNode(t(String(kid))));
   }
   return el;
 }
 
+// User-authored values must bypass UI translation even when they match a label.
+const raw = (value) => document.createTextNode(String(value ?? ''));
+
 // replaceChildren() turns null into the text "null", so drop empty slots first.
 const nodes = (...list) => list.flat(Infinity).filter(Boolean);
 
-const nf = new Intl.NumberFormat('ru-RU');
-const money = (n) => (n === 0 ? 'Free' : `${nf.format(n)} ₸`);
+const LISTING_TYPES = ['sell', 'exchange', 'free', 'wanted'];
+const STATUSES = ['active', 'reserved', 'sold'];
+const listingTypeText = (type) => t(({ sell: 'For sale', exchange: 'For exchange', free: 'Give away for free', wanted: 'Wanted' })[type] || 'For sale');
+const statusText = (status) => t(({ active: 'Active', reserved: 'Reserved', sold: 'Sold' })[status] || 'Active');
+const statusBadge = (listing) => (listing.status && listing.status !== 'active'
+  ? h('span', { class: `badge ${listing.status === 'sold' ? 'badge-sold' : 'badge-reserved'}` }, statusText(listing.status)) : null);
+
+function statusControl(listing, onChange) {
+  const select = h('select', { class: 'status-select', 'aria-label': 'Listing status' },
+    STATUSES.map((status) => h('option', { value: status, selected: status === (listing.status || 'active') }, statusText(status))));
+  select.addEventListener('change', async () => {
+    if (select.value === listing.status) return;
+    select.disabled = true;
+    try {
+      await api(`/listings/${listing.id}/status`, { method: 'PATCH', body: { status: select.value } });
+      listing.status = select.value;
+      toast(t('Status updated'));
+      onChange();
+    } catch (ex) {
+      toast(t(ex.message));
+      select.value = listing.status || 'active';
+    } finally { select.disabled = false; }
+  });
+  return select;
+}
+
+function listingCount(count) {
+  const n = nf.format(count);
+  const locale = window.sduLocale?.() || 'en';
+  if (locale === 'ru') {
+    const mod10 = count % 10, mod100 = count % 100;
+    const noun = mod10 === 1 && mod100 !== 11 ? 'объявление' : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 'объявления' : 'объявлений';
+    return `${n} ${noun}`;
+  }
+  if (locale === 'kk') return `${n} хабарландыру`;
+  return `${n} ${count === 1 ? 'listing' : 'listings'}`;
+}
+
+function viewCount(count) {
+  const n = nf.format(count);
+  const locale = window.sduLocale?.() || 'en';
+  if (locale === 'ru') {
+    const plural = new Intl.PluralRules('ru').select(count);
+    return `${n} ${{ one: 'просмотр', few: 'просмотра', many: 'просмотров', other: 'просмотра' }[plural]}`;
+  }
+  if (locale === 'kk') return `${n} қаралым`;
+  return `${n} ${t(count === 1 ? 'view' : 'views')}`;
+}
+
+function pageSummary(page, pages) {
+  const locale = window.sduLocale?.() || 'en';
+  if (locale === 'ru') return `Страница ${nf.format(page)} из ${nf.format(pages)}`;
+  if (locale === 'kk') return `${nf.format(pages)} беттің ${nf.format(page)}-беті`;
+  return `Page ${nf.format(page)} of ${nf.format(pages)}`;
+}
+
+function listingMeta(listing) {
+  const city = t(listing.city);
+  const posted = timeAgo(listing.created_at);
+  const locale = window.sduLocale?.() || 'en';
+  if (locale === 'ru') return `${city} · ${posted}`;
+  if (locale === 'kk') return `${city} · ${posted}`;
+  return `${city}, ${posted}`;
+}
+
+function activeListingCount(count) {
+  const n = nf.format(count);
+  const locale = window.sduLocale?.() || 'en';
+  if (locale === 'ru') {
+    const plural = new Intl.PluralRules('ru').select(count);
+    const phrase = { one: 'активное объявление', few: 'активных объявления', many: 'активных объявлений', other: 'активных объявлений' }[plural];
+    return `${n} ${phrase}`;
+  }
+  if (locale === 'kk') return `${n} белсенді хабарландыру`;
+  return `${n} active ${t(count === 1 ? 'listing' : 'listings')}`;
+}
+
+function photoLabel(index, action = 'Photo') {
+  const locale = window.sduLocale?.() || 'en';
+  if (locale === 'ru') return action === 'Show photo' ? `Показать фото ${index}` : action === 'Remove photo' ? `Удалить фото ${index}` : `Фото ${index}`;
+  if (locale === 'kk') return action === 'Show photo' ? `${index}-суретті көрсету` : action === 'Remove photo' ? `${index}-суретті жою` : `${index}-сурет`;
+  return `${t(action)} ${index}`;
+}
+
+const money = (n) => (n === 0 ? t('Free price') : `${nf.format(n)} ₸`);
+const listingPrice = (listing) => listing.listing_type === 'wanted' && listing.price === 0 ? t('No budget specified') : money(listing.price);
+
+function findsExplored(count) {
+  const n = nf.format(count);
+  const locale = window.sduLocale?.() || 'en';
+  if (locale === 'ru') return `Просмотрено находок: ${n}`;
+  if (locale === 'kk') return `${n} табылым қаралды`;
+  return `${n} finds explored`;
+}
 
 function timeAgo(sqlDate) {
   const d = new Date(sqlDate.replace(' ', 'T') + 'Z');
   const sec = (Date.now() - d.getTime()) / 1000;
-  if (sec < 60) return 'just now';
+  const locale = window.sduLocale?.() || 'en';
+  if (sec < 60) return t('just now');
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} min ago`;
+  if (min < 60) return locale === 'ru' ? `${min} мин. назад` : locale === 'kk' ? `${min} мин бұрын` : `${min} min ago`;
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} h ago`;
+  if (hr < 24) return locale === 'ru' ? `${hr} ч назад` : locale === 'kk' ? `${hr} сағ бұрын` : `${hr} h ago`;
   const day = Math.floor(hr / 24);
-  if (day < 30) return day === 1 ? 'yesterday' : `${day} days ago`;
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  if (day < 30) return day === 1 ? t('yesterday') : locale === 'ru' ? `${day} дн. назад` : locale === 'kk' ? `${day} күн бұрын` : `${day} days ago`;
+  return d.toLocaleDateString(localeTag(), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function prettyPhone(p) {
@@ -59,13 +159,13 @@ function prettyPhone(p) {
 function whatsappLink(phone, title) {
   let d = (phone || '').replace(/\D/g, '');
   if (d.length === 11 && d.startsWith('8')) d = '7' + d.slice(1);
-  const text = `Hi! Is "${title}" still available? (from SduSell)`;
+  const text = `${t('Hi! Is')} "${title}" ${t('still available? (from SduSell)')}`;
   return `https://wa.me/${d}?text=${encodeURIComponent(text)}`;
 }
 
 let toastTimer;
 function toast(message) {
-  $toast.textContent = message;
+  $toast.textContent = t(message);
   $toast.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => $toast.classList.remove('show'), 3200);
@@ -157,7 +257,13 @@ function setSession(token, user) {
 }
 
 function renderActions() {
-  $actions.replaceChildren(h('a', { class: 'discover-link', href: '#/discover' }, 'Finds'));
+  const localeSelect = h('label', { class: 'locale-switch' },
+    h('span', { class: 'visually-hidden' }, 'Choose language'),
+    h('select', { 'aria-label': 'Choose language', value: window.sduLocale?.() || 'en', onchange: (e) => window.sduSetLocale?.(e.target.value) },
+      h('option', { value: 'en', selected: window.sduLocale?.() === 'en' }, 'EN'),
+      h('option', { value: 'ru', selected: window.sduLocale?.() === 'ru' }, 'RU'),
+      h('option', { value: 'kk', selected: window.sduLocale?.() === 'kk' }, 'KZ')));
+  $actions.replaceChildren(localeSelect, h('a', { class: 'discover-link', href: '#/discover' }, 'Finds'));
   const sell = h('a', { class: 'btn btn-sun', href: '#/sell' }, '+ Sell');
   if (!state.user) {
     $actions.append(
@@ -171,7 +277,7 @@ function renderActions() {
       h('span', { class: 'avatar' }, state.user.name.trim().charAt(0).toUpperCase()),
     ),
     h('div', { class: 'menu-panel' },
-      h('p', { class: 'menu-name' }, state.user.name),
+      h('p', { class: 'menu-name' }, raw(state.user.name)),
       h('a', { href: '#/me' }, 'My listings'),
       h('a', { href: '#/favorites' }, 'Favorites'),
       h('button', { type: 'button', onclick: logout }, 'Log out'),
@@ -179,6 +285,12 @@ function renderActions() {
   );
   $actions.append(sell, menu);
 }
+
+window.addEventListener('sdusell:localechange', () => {
+  nf = new Intl.NumberFormat(localeTag());
+  renderActions();
+  render();
+});
 
 document.addEventListener('click', (e) => {
   document.querySelectorAll('details.menu[open]').forEach((d) => { if (!d.contains(e.target)) d.removeAttribute('open'); });
@@ -273,7 +385,7 @@ function openAuth(mode = 'login', reason) {
       toast(mode === 'login' ? `Welcome back, ${res.user.name}` : 'Account created');
       render();
     } catch (ex) {
-      err.textContent = ex.message;
+    err.textContent = t(ex.message);
       btn.disabled = false;
     }
   });
@@ -293,7 +405,7 @@ function favToggle(l, { labelled = false, onChange } = {}) {
   const btn = h('button', { class: `fav${labelled ? ' fav-labelled' : ''}`, type: 'button' });
   function paint() {
     btn.setAttribute('aria-pressed', String(l.favorited));
-    btn.setAttribute('aria-label', l.favorited ? 'Remove from favorites' : 'Add to favorites');
+    btn.setAttribute('aria-label', t(l.favorited ? 'Remove from favorites' : 'Add to favorites'));
     btn.innerHTML = HEART;
     if (labelled) btn.append(h('span', {}, l.favorited ? 'Saved' : 'Save'));
   }
@@ -318,14 +430,17 @@ function card(l, opts = {}) {
     h('div', { class: 'card-top' },
       h('a', { class: 'card-media', href, tabindex: '-1', 'aria-hidden': 'true' },
         l.cover ? h('img', { src: l.cover, alt: '', loading: 'lazy' }) : placeholder(l.category),
-        l.status === 'sold' ? h('span', { class: 'badge badge-sold' }, 'Sold') : h('span', { class: 'card-condition' }, l.condition === 'new' ? 'New' : 'Pre-loved'),
+        statusBadge(l),
+        h('span', { class: 'card-condition' }, l.condition === 'new' ? 'New' : 'Pre-loved'),
       ),
       favToggle(l, { onChange: opts.onFavChange ? (v) => opts.onFavChange(v, l) : undefined }),
     ),
     h('a', { class: 'card-body', href },
-      h('p', { class: 'price' }, money(l.price)),
-      h('h3', { class: 'card-title' }, l.title),
-      h('p', { class: 'card-meta' }, `${l.city}, ${timeAgo(l.created_at)}`),
+      h('span', { class: 'listing-type-label' }, listingTypeText(l.listing_type || 'sell')),
+      h('p', { class: 'price' }, listingPrice(l)),
+      h('h3', { class: 'card-title' }, raw(l.title)),
+      l.subject || l.course ? h('p', { class: 'card-course' }, raw([l.subject, l.course].filter(Boolean).join(' · '))) : null,
+      h('p', { class: 'card-meta' }, listingMeta(l)),
     ),
   );
 }
@@ -342,7 +457,7 @@ function errorState(ex) {
 }
 
 // ---------- views ----------
-const FILTER_KEYS = ['q', 'category', 'city', 'min', 'max', 'condition', 'sort', 'seller'];
+const FILTER_KEYS = ['q', 'category', 'categories', 'type', 'subject', 'course', 'city', 'min', 'max', 'condition', 'sort', 'seller'];
 
 function readFilters(params) {
   const f = {};
@@ -366,19 +481,34 @@ async function viewHome(params) {
   for (const k of FILTER_KEYS) if (f[k]) api_q.set(k, f[k]);
   const data = await api(`/listings?${api_q}`);
 
-  document.title = f.q ? `${f.q} - SduSell` : 'SduSell - buy and sell in Kazakhstan';
+  document.title = f.q ? `${t(`Results for “${f.q}”`)} - SduSell` : f.seller ? `${t('Listings from this seller')} - SduSell` : f.category ? `${t(f.category)} - SduSell` : t('SduSell - buy and sell in Kazakhstan');
 
   // category chips
   const chips = h('nav', { class: 'chips', 'aria-label': 'Categories' },
-    h('a', { class: 'chip', href: filtersToHash({ ...f, category: '' }), 'aria-current': String(!f.category) }, 'All'),
+    h('a', { class: 'chip', href: filtersToHash({ ...f, category: '', categories: '' }), 'aria-current': String(!f.category && !f.categories) }, 'All'),
     state.meta.categories.map((c) =>
-      h('a', { class: 'chip', href: filtersToHash({ ...f, category: c }), 'aria-current': String(f.category === c) },
+      h('a', { class: 'chip', href: filtersToHash({ ...f, category: c, categories: '' }), 'aria-current': String(f.category === c) },
         artwork(c, 'category-icon'), c)),
   );
 
+  const collectionLinks = [
+    ['For studying', 'Books & Study,Electronics'],
+    ['For the dorm', 'Home & Garden,Kids'],
+    ['Student services', 'Services'],
+  ];
+  const collections = h('section', { class: 'collections', 'aria-labelledby': 'collections-heading' },
+    h('div', { class: 'market-section-label' }, h('h2', { id: 'collections-heading' }, 'Campus collections')),
+    h('div', { class: 'collection-links' }, collectionLinks.map(([label, categories]) =>
+      h('a', { class: 'collection-link', href: filtersToHash({ ...f, category: '', categories }) }, label))));
+
   // filters
   const form = h('form', { class: 'filters-form' },
+    field('Listing type', h('select', { name: 'type' },
+      [['', 'All types'], ...LISTING_TYPES.map((type) => [type, ({ sell: 'For sale', exchange: 'For exchange', free: 'Give away for free', wanted: 'Wanted' })[type]])]
+        .map(([value, label]) => h('option', { value, selected: f.type === value }, label)))),
     field('City', (() => { const s = citySelect(f.city, true, 'All of Kazakhstan'); return s; })()),
+    field('Book subject or course', h('input', { name: 'subject', type: 'search', value: f.subject, placeholder: 'For example: Calculus I' })),
+    field('Course / level', h('input', { name: 'course', type: 'search', value: f.course, placeholder: 'For example: 1 or MATH-101' })),
     h('div', { class: 'field-row' },
       field('Price from', h('input', { name: 'min', type: 'number', min: 0, inputmode: 'numeric', placeholder: '0', value: f.min })),
       field('Price to', h('input', { name: 'max', type: 'number', min: 0, inputmode: 'numeric', placeholder: 'Any', value: f.max })),
@@ -398,7 +528,7 @@ async function viewHome(params) {
   );
   const apply = () => {
     const d = Object.fromEntries(new FormData(form));
-    location.hash = filtersToHash({ ...f, city: d.city, min: d.min, max: d.max, condition: d.condition, sort: d.sort });
+    location.hash = filtersToHash({ ...f, type: d.type, subject: d.subject, course: d.course, city: d.city, min: d.min, max: d.max, condition: d.condition, sort: d.sort });
   };
   form.addEventListener('submit', (e) => { e.preventDefault(); apply(); });
   form.addEventListener('change', apply);
@@ -416,7 +546,7 @@ async function viewHome(params) {
   const results = h('section', { class: 'results', 'aria-labelledby': 'results-h' },
     h('div', { class: 'results-head' },
       h(isBrowse ? 'h2' : 'h1', { id: 'results-h' }, heading),
-      h('p', { class: 'muted' }, data.total === 1 ? '1 listing' : `${nf.format(data.total)} listings`),
+      h('p', { class: 'muted' }, listingCount(data.total)),
     ),
     data.items.length
       ? grid
@@ -424,7 +554,7 @@ async function viewHome(params) {
         h('a', { class: 'btn btn-quiet', href: '#/' }, 'Show all listings')),
     data.pages > 1 ? h('nav', { class: 'pager', 'aria-label': 'Pages' },
       f.page > 1 ? h('a', { class: 'btn btn-quiet', href: filtersToHash(f, f.page - 1) }, 'Previous') : h('span'),
-      h('span', { class: 'muted' }, `Page ${data.page} of ${data.pages}`),
+      h('span', { class: 'muted' }, pageSummary(data.page, data.pages)),
       f.page < data.pages ? h('a', { class: 'btn btn-quiet', href: filtersToHash(f, f.page + 1) }, 'Next') : h('span'),
     ) : null,
   );
@@ -445,6 +575,7 @@ async function viewHome(params) {
       h('div', { class: 'hero-tile hero-tile-books' }, artwork('Books & Study'), h('span', { class: 'hero-tile-label' }, 'Pass it on')),
       h('span', { class: 'hero-sticker' }, 'Campus life.', h('br'), 'Second stories.'))) : null;
   return h('div', { class: 'page home-page' }, hero,
+    isBrowse ? collections : null,
     h('div', { class: 'market-section-label' }, h('h2', {}, 'Find your thing'), h('span', {}, 'A little bit of everything.')),
     chips, h('div', { class: 'home-layout' }, filters, results));
 }
@@ -452,7 +583,7 @@ async function viewHome(params) {
 
 // One card at a time. Only explicit saves affect recommendations, never dwell time.
 async function viewDiscovery() {
-  document.title = 'SDU Finds - SduSell';
+  document.title = `${t('SDU Finds')} - SduSell`;
   $q.value = '';
   const seen = new Set();
   let queue = [], busy = false, ended = false;
@@ -486,13 +617,13 @@ async function viewDiscovery() {
       next.hidden = true;
       stage.replaceChildren(emptyState('You’re all caught up.', 'Great finds deserve a pause. Come back for new listings, or browse the full marketplace.',
         h('a', { class: 'btn btn-sun', href: '#/' }, 'Browse marketplace')));
-      counter.textContent = `${seen.size} finds explored`;
-      status.textContent = 'End of this collection.';
+      counter.textContent = findsExplored(seen.size);
+      status.textContent = t('End of this collection.');
       return;
     }
     seen.add(l.id);
-    counter.textContent = `Find ${seen.size} · made for your curiosity`;
-    status.textContent = `${l.title}. ${money(l.price)}. ${l.reason}`;
+    counter.textContent = window.sduLocale?.() === 'ru' ? `Находка ${nf.format(seen.size)} · по вашим интересам` : window.sduLocale?.() === 'kk' ? `${nf.format(seen.size)}-табылым · қызығушылығыңызға сай` : `Find ${seen.size} · made for your curiosity`;
+      status.textContent = `${l.title}. ${listingPrice(l)}. ${t(l.reason)}`;
     const save = h('button', { class: 'btn discovery-save', type: 'button', onclick: () => react('like') }, '♡ Save find');
     const pass = h('button', { class: 'btn btn-quiet', type: 'button', onclick: () => react('pass') }, '× Not for me');
     stage.replaceChildren(h('article', { class: 'discovery-card' },
@@ -500,10 +631,10 @@ async function viewDiscovery() {
         l.cover ? h('img', { src: l.cover, alt: l.title }) : placeholder(l.category),
         h('span', { class: 'discovery-category' }, l.category)),
       h('div', { class: 'discovery-body' },
-        h('p', { class: 'discovery-reason' }, `✦ ${l.reason}`),
-        h('div', { class: 'discovery-title-row' }, h('h2', {}, l.title), h('p', { class: 'price price-lg' }, money(l.price))),
-        h('p', { class: 'muted' }, `${l.city} · ${l.condition === 'new' ? 'New' : 'Used'} · ${l.seller_name}`),
-        h('p', { class: 'discovery-description' }, l.description || 'Take a closer look and contact the seller.'),
+        h('p', { class: 'discovery-reason' }, `✦ ${t(l.reason)}`),
+        h('div', { class: 'discovery-title-row' }, h('h2', {}, raw(l.title)), h('p', { class: 'price price-lg' }, listingPrice(l))),
+        h('p', { class: 'muted' }, `${t(l.city)} · ${t(l.condition === 'new' ? 'New' : 'Used')} · ${l.seller_name}`),
+        h('p', { class: 'discovery-description' }, l.description ? raw(l.description) : 'Take a closer look and contact the seller.'),
         h('div', { class: 'discovery-card-actions' }, save, pass, h('a', { class: 'discovery-details', href: `#/listing/${l.id}` }, 'View details ↗')))));
   }
   function setBusy(value) {
@@ -538,7 +669,7 @@ async function viewDiscovery() {
           'We couldn’t load the next find. Retry when your connection is back.',
           h('button', { class: 'btn btn-primary', type: 'button', onclick: () => advance() }, 'Retry next find')));
       } else queue = previousQueue;
-      status.textContent = ex.message;
+      status.textContent = t(ex.message);
       toast(ex.message);
     } finally {
       setBusy(false);
@@ -583,6 +714,7 @@ async function viewListing(id) {
   document.title = `${l.title} - SduSell`;
   $q.value = '';
   const isOwner = !!state.user && state.user.id === l.user_id;
+  const listingType = l.listing_type || 'sell';
 
   // gallery
   const stage = h('div', { class: 'gallery-stage' });
@@ -590,7 +722,7 @@ async function viewListing(id) {
   function show(i) {
     stage.replaceChildren(...nodes(
       l.images.length ? h('img', { src: l.images[i], alt: `${l.title}, photo ${i + 1} of ${l.images.length}` }) : placeholder(l.category),
-      l.status === 'sold' ? h('span', { class: 'badge badge-sold badge-lg' }, 'Sold') : null,
+      statusBadge(l),
     ));
     thumbs.querySelectorAll('button').forEach((b, j) => b.setAttribute('aria-current', String(j === i)));
   }
@@ -607,12 +739,14 @@ async function viewListing(id) {
       h('p', { class: 'muted' }, l.status === 'sold' ? 'This listing is marked as sold.' : 'This is your listing. Buyers see your phone number after they ask for it.'),
       h('div', { class: 'owner-actions' },
         h('a', { class: 'btn btn-primary', href: `#/edit/${l.id}` }, 'Edit listing'),
-        h('button', { class: 'btn btn-quiet', type: 'button', onclick: () => toggleSold(l, () => render()) }, l.status === 'sold' ? 'Mark as available' : 'Mark as sold'),
+        statusControl(l, () => render()),
         h('button', { class: 'btn btn-danger-quiet', type: 'button', onclick: () => deleteListing(l, () => { location.hash = '#/me'; }) }, 'Delete'),
       ),
     );
   } else if (l.status === 'sold') {
     contact.append(h('p', { class: 'muted' }, 'This item has been sold.'));
+  } else if (l.status === 'reserved') {
+    contact.append(h('p', { class: 'muted' }, 'This listing is reserved. Contact is temporarily unavailable.'));
   } else if (l.seller.phone) {
     const reveal = h('button', {
       class: 'btn btn-primary btn-block', type: 'button',
@@ -624,25 +758,29 @@ async function viewListing(id) {
     contact.append(h('p', { class: 'muted' }, 'The seller has not added a phone number yet.'));
   }
 
-  const since = new Date(l.seller.created_at.replace(' ', 'T') + 'Z').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const since = new Date(l.seller.created_at.replace(' ', 'T') + 'Z').toLocaleDateString(localeTag(), { month: 'long', year: 'numeric' });
 
   const panel = h('aside', { class: 'panel' },
-    h('p', { class: 'price price-lg' }, money(l.price)),
-    h('h1', { class: 'listing-title' }, l.title),
+    h('p', { class: 'price price-lg' }, listingPrice(l)),
+    h('h1', { class: 'listing-title' }, raw(l.title)),
+    h('p', { class: 'listing-type-label' }, listingTypeText(listingType)),
     h('ul', { class: 'tags' },
       h('li', {}, l.condition === 'new' ? 'New' : 'Used'),
       l.negotiable ? h('li', {}, 'Negotiable') : null,
       h('li', {}, l.category),
+      l.subject ? h('li', {}, raw(l.subject)) : null,
+      l.course ? h('li', {}, raw(l.course)) : null,
     ),
-    h('p', { class: 'muted' }, `${l.city}. Posted ${timeAgo(l.created_at)}. ${nf.format(l.views)} ${l.views === 1 ? 'view' : 'views'}.`),
+    statusBadge(l),
+    h('p', { class: 'muted' }, window.sduLocale?.() === 'ru' ? `${t(l.city)}. Опубликовано: ${timeAgo(l.created_at)}. ${viewCount(l.views)}.` : window.sduLocale?.() === 'kk' ? `${t(l.city)}. Жарияланды: ${timeAgo(l.created_at)}. ${viewCount(l.views)}.` : `${t(l.city)}. Posted ${timeAgo(l.created_at)}. ${viewCount(l.views)}.`),
     contact,
     isOwner ? null : favToggle(l, { labelled: true }),
     h('div', { class: 'seller' },
-      h('span', { class: 'avatar avatar-lg' }, l.seller.name.trim().charAt(0).toUpperCase()),
+      h('span', { class: 'avatar avatar-lg' }, raw(l.seller.name.trim().charAt(0).toUpperCase())),
       h('div', {},
-        h('p', { class: 'seller-name' }, l.seller.name),
-        h('p', { class: 'muted' }, `On SduSell since ${since}`),
-        h('a', { href: `#/?seller=${l.seller.id}` }, `${l.seller.active_listings} active ${l.seller.active_listings === 1 ? 'listing' : 'listings'}`),
+        h('p', { class: 'seller-name' }, raw(l.seller.name)),
+        h('p', { class: 'muted' }, window.sduLocale?.() === 'ru' ? `На SduSell с ${since}` : window.sduLocale?.() === 'kk' ? `SduSell-де ${since} жылдан бері` : `On SduSell since ${since}`),
+        h('a', { href: `#/?seller=${l.seller.id}` }, activeListingCount(l.seller.active_listings)),
       ),
     ),
   );
@@ -655,20 +793,11 @@ async function viewListing(id) {
       h('div', { class: 'gallery' }, stage, thumbs),
       h('section', { class: 'desc' },
         h('h2', {}, 'Description'),
-        l.description ? h('p', { class: 'desc-text' }, l.description) : h('p', { class: 'muted' }, 'The seller did not add a description.'),
+        l.description ? h('p', { class: 'desc-text' }, raw(l.description)) : h('p', { class: 'muted' }, 'The seller did not add a description.'),
       ),
       panel,
     ),
   );
-}
-
-async function toggleSold(l, done) {
-  try {
-    const next = l.status === 'sold' ? 'active' : 'sold';
-    await api(`/listings/${l.id}/status`, { method: 'PATCH', body: { status: next } });
-    toast(next === 'sold' ? 'Marked as sold' : 'Listing is available again');
-    done();
-  } catch (ex) { toast(ex.message); }
 }
 
 async function deleteListing(l, done) {
@@ -707,27 +836,49 @@ async function viewSell(editId) {
     l = await api(`/listings/${editId}`);
     if (l.user_id !== state.user.id) throw new ApiError(403, 'You can only edit your own listings.');
   }
-  document.title = `${l ? 'Edit listing' : 'Post a listing'} - SduSell`;
+  document.title = `${t(l ? 'Edit listing' : 'Post a listing')} - SduSell`;
   $q.value = '';
 
   let images = l ? [...l.images] : [];
   const previews = h('ul', { class: 'photos' });
   const photoErr = h('p', { class: 'form-error', role: 'alert' });
+  const categorySelect = (() => {
+    const s = h('select', { name: 'category', required: true }, h('option', { value: '' }, 'Choose a category'));
+    for (const c of state.meta.categories) s.append(h('option', { value: c, selected: l && l.category === c }, c));
+    return s;
+  })();
+  const typeSelect = h('select', { name: 'listing_type' }, LISTING_TYPES.map((type) =>
+    h('option', { value: type, selected: type === (l?.listing_type || 'sell') }, ({ sell: 'Sell', exchange: 'Exchange', free: 'Give away for free', wanted: 'Looking for' })[type])));
+  const subjectInput = h('input', { name: 'subject', maxlength: 100, value: l?.subject || '', placeholder: 'For example: Calculus I' });
+  const courseInput = h('input', { name: 'course', maxlength: 80, value: l?.course || '', placeholder: 'For example: 1 or MATH-101' });
+  const bookFields = h('fieldset', { class: 'book-fields', hidden: !l || l.category !== 'Books & Study' },
+    h('legend', {}, 'Book subject and course'),
+    h('div', { class: 'field-row' }, field('Subject', subjectInput), field('Course / level', courseInput)),
+    h('p', { class: 'hint' }, 'These fields are optional and help students find the right book.'));
+  const priceLabel = h('span', {}, l?.listing_type === 'wanted' ? 'Price or budget in tenge' : 'Price in tenge');
+  categorySelect.addEventListener('change', () => { bookFields.hidden = categorySelect.value !== 'Books & Study'; });
+  typeSelect.addEventListener('change', () => {
+    priceLabel.textContent = t(typeSelect.value === 'wanted' ? 'Price or budget in tenge' : 'Price in tenge');
+    priceInput.required = typeSelect.value !== 'wanted';
+    if (typeSelect.value === 'wanted' && priceInput.value === '0') priceInput.value = '';
+    if (typeSelect.value === 'free') priceInput.value = '0';
+  });
+  const priceInput = h('input', { name: 'price', type: 'number', min: 0, step: 1, inputmode: 'numeric', required: l?.listing_type !== 'wanted', value: l ? l.price : '', placeholder: '0' });
 
   function drawPhotos() {
     previews.replaceChildren(...images.map((src, i) =>
       h('li', { class: 'photo' },
-        h('img', { src, alt: `Photo ${i + 1}` }),
+        h('img', { src, alt: photoLabel(i + 1) }),
         i === 0 ? h('span', { class: 'badge badge-cover' }, 'Cover') : h('button', { class: 'photo-btn photo-cover', type: 'button', onclick: () => { images.unshift(images.splice(i, 1)[0]); drawPhotos(); } }, 'Make cover'),
-        h('button', { class: 'photo-btn photo-remove', type: 'button', 'aria-label': `Remove photo ${i + 1}`, onclick: () => { images.splice(i, 1); drawPhotos(); } }, 'Remove'),
+        h('button', { class: 'photo-btn photo-remove', type: 'button', 'aria-label': photoLabel(i + 1, 'Remove photo'), onclick: () => { images.splice(i, 1); drawPhotos(); } }, 'Remove'),
       )));
   }
   const fileInput = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', multiple: true, class: 'visually-hidden', id: 'photo-input' });
   fileInput.addEventListener('change', async () => {
     photoErr.textContent = '';
     for (const file of fileInput.files) {
-      if (images.length >= 8) { photoErr.textContent = 'You can add up to 8 photos.'; break; }
-      try { images.push(await readImage(file)); } catch (ex) { photoErr.textContent = ex.message; }
+      if (images.length >= 8) { photoErr.textContent = t('You can add up to 8 photos.'); break; }
+      try { images.push(await readImage(file)); } catch (ex) { photoErr.textContent = t(ex.message); }
     }
     fileInput.value = '';
     drawPhotos();
@@ -744,16 +895,14 @@ async function viewSell(editId) {
       fileInput, photoErr,
     ),
     field('Title', h('input', { name: 'title', required: true, minlength: 3, maxlength: 100, value: l ? l.title : '', placeholder: 'For example: Lenovo IdeaPad 3, 16 GB RAM' })),
+    field('Listing type', typeSelect),
     h('div', { class: 'field-row' },
-      field('Category', (() => {
-        const s = h('select', { name: 'category', required: true }, h('option', { value: '' }, 'Choose a category'));
-        for (const c of state.meta.categories) s.append(h('option', { value: c, selected: l && l.category === c }, c));
-        return s;
-      })()),
+      field('Category', categorySelect),
       field('City', (() => { const s = citySelect(l ? l.city : state.user.city, true); s.required = true; return s; })()),
     ),
+    bookFields,
     h('div', { class: 'field-row' },
-      field('Price in tenge', h('input', { name: 'price', type: 'number', min: 0, step: 1, inputmode: 'numeric', required: true, value: l ? l.price : '', placeholder: '0' }), 'Enter 0 for a free item.'),
+      field(priceLabel, priceInput, 'Enter 0 for a free item.'),
       h('fieldset', { class: 'field radios' },
         h('legend', {}, 'Condition'),
         h('label', {}, h('input', { type: 'radio', name: 'condition', value: 'used', checked: !l || l.condition === 'used' }), 'Used'),
@@ -774,21 +923,22 @@ async function viewSell(editId) {
     const d = Object.fromEntries(new FormData(form));
     const btn = form.querySelector('button[type=submit]');
     err.textContent = '';
-    if (d.title.trim().length < 3) { err.textContent = 'Add a title with at least 3 characters.'; return; }
-    if (!d.category) { err.textContent = 'Choose a category.'; return; }
-    if (!d.city) { err.textContent = 'Choose a city.'; return; }
-    if (d.price === '' || Number(d.price) < 0) { err.textContent = 'Enter a price in tenge, or 0 for free.'; return; }
+    if (d.title.trim().length < 3) { err.textContent = t('Add a title with at least 3 characters.'); return; }
+    if (!d.category) { err.textContent = t('Choose a category.'); return; }
+    if (!d.city) { err.textContent = t('Choose a city.'); return; }
+    if ((d.price === '' && d.listing_type !== 'wanted') || Number(d.price) < 0) { err.textContent = t('Enter a price in tenge, or 0 for free.'); return; }
+    if (d.listing_type === 'free' || (d.listing_type === 'wanted' && d.price === '')) d.price = '0';
     btn.disabled = true;
-    btn.textContent = 'Saving…';
+    btn.textContent = t('Saving…');
     try {
       const saved = await api(l ? `/listings/${l.id}` : '/listings', {
         method: l ? 'PUT' : 'POST',
-        body: { ...d, price: Number(d.price), negotiable: !!d.negotiable, images },
+        body: { ...d, price: Number(d.price), negotiable: !!d.negotiable, subject: categorySelect.value === 'Books & Study' ? d.subject.trim() || null : null, course: categorySelect.value === 'Books & Study' ? d.course.trim() || null : null, images },
       });
       toast(l ? 'Changes saved' : 'Listing published');
       location.hash = `#/listing/${saved.id}`;
     } catch (ex) {
-      err.textContent = ex.message;
+      err.textContent = t(ex.message);
       btn.disabled = false;
       btn.textContent = l ? 'Save changes' : 'Publish listing';
     }
@@ -804,7 +954,7 @@ async function viewMine() {
       emptyState('Log in to see your listings', 'Your listings and their status appear here.',
         h('button', { class: 'btn btn-primary', type: 'button', onclick: () => openAuth('login') }, 'Log in')));
   }
-  document.title = 'My listings - SduSell';
+  document.title = `${t('My listings')} - SduSell`;
   $q.value = '';
   const data = await api('/listings?mine=1&limit=50');
   const list = h('ul', { class: 'rows' });
@@ -813,13 +963,13 @@ async function viewMine() {
       h('li', { class: 'row' },
         h('a', { class: 'row-thumb', href: `#/listing/${l.id}`, tabindex: '-1', 'aria-hidden': 'true' }, l.cover ? h('img', { src: l.cover, alt: '', loading: 'lazy' }) : placeholder(l.category)),
         h('div', { class: 'row-main' },
-          h('a', { class: 'row-title', href: `#/listing/${l.id}` }, l.title),
-          h('p', { class: 'price' }, money(l.price)),
-          h('p', { class: 'muted' }, `${l.status === 'sold' ? 'Sold' : 'Active'}. ${nf.format(l.views)} ${l.views === 1 ? 'view' : 'views'}. Posted ${timeAgo(l.created_at)}.`),
+          h('a', { class: 'row-title', href: `#/listing/${l.id}` }, raw(l.title)),
+          h('p', { class: 'price' }, listingPrice(l)),
+          h('p', { class: 'muted' }, window.sduLocale?.() === 'ru' ? `${statusText(l.status || 'active')}. ${viewCount(l.views)}. Опубликовано: ${timeAgo(l.created_at)}.` : window.sduLocale?.() === 'kk' ? `${statusText(l.status || 'active')}. ${viewCount(l.views)}. Жарияланды: ${timeAgo(l.created_at)}.` : `${statusText(l.status || 'active')}. ${viewCount(l.views)}. Posted ${timeAgo(l.created_at)}.`),
         ),
         h('div', { class: 'row-actions' },
           h('a', { class: 'btn btn-quiet', href: `#/edit/${l.id}` }, 'Edit'),
-          h('button', { class: 'btn btn-quiet', type: 'button', onclick: () => toggleSold(l, () => render()) }, l.status === 'sold' ? 'Mark as available' : 'Mark as sold'),
+          statusControl(l, () => render()),
           h('button', { class: 'btn btn-danger-quiet', type: 'button', onclick: () => deleteListing(l, () => render()) }, 'Delete'),
         ),
       )));
@@ -840,7 +990,7 @@ async function viewFavorites() {
       emptyState('Log in to see your favorites', 'Tap the heart on any listing to keep it here.',
         h('button', { class: 'btn btn-primary', type: 'button', onclick: () => openAuth('login', 'Log in to see favorites') }, 'Log in')));
   }
-  document.title = 'Favorites - SduSell';
+  document.title = `${t('Favorites')} - SduSell`;
   $q.value = '';
   const data = await api('/listings?favorites=1&limit=50');
   const wrap = h('div', { class: 'page' });
