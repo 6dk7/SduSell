@@ -25,7 +25,7 @@ PORT=8080 npm start                   # change the port
 ## What it does
 
 - Sign up and log in (passwords hashed with scrypt, sessions expire after 14 days)
-- Post, edit, delete a listing; mark it as sold or available again
+- Post, edit, and delete listings; set their status to active, reserved, or sold
 - Up to 8 photos per listing, resized in the browser before upload; choose the cover photo
 - Browse with search (works for Russian and English), category, city, price range, condition and sort
 - Switch the interface between Russian, Kazakh and English
@@ -100,10 +100,12 @@ This is a solid course project, not a production service. Things to add first:
 
 ## Ideas for next steps
 
-- Kazakh and Russian interface language switch
-- Chat between buyer and seller instead of phone and WhatsApp only
-- Profile page where users edit their name, phone and city (the API already has `PUT /api/auth/me`)
-- Promoted listings, saved searches, listing expiry after 30 days
+- Turkish interface translation, with a complete review of all user-facing text
+- In-app chat between buyers and sellers, alongside phone and WhatsApp contact
+- Account settings for editing a user's name, phone number, and city
+- Saved searches with notifications when matching listings are posted
+- Seller profiles with ratings and listing history
+- Listing expiry and renewal, plus optional promoted listings
 
 ## SDU Finds
 
