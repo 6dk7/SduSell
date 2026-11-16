@@ -55,6 +55,13 @@ CREATE TABLE IF NOT EXISTS favorites (
   PRIMARY KEY (user_id, listing_id)
 );
 
+CREATE TABLE IF NOT EXISTS discovery_reactions (
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+  reaction   TEXT NOT NULL CHECK (reaction IN ('like', 'pass')),
+  PRIMARY KEY (user_id, listing_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_listings_category ON listings(category);
 CREATE INDEX IF NOT EXISTS idx_listings_city     ON listings(city);
 CREATE INDEX IF NOT EXISTS idx_listings_user     ON listings(user_id);
