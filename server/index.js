@@ -1,5 +1,5 @@
 // SduSell backend: zero-dependency Node HTTP server + SQLite.
-// Serves the REST API under /api and the frontend from /public.
+// Serves the REST API under /api and the built React frontend from /dist (run `npm run build`).
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -8,7 +8,7 @@ const { db, DATA_DIR, CATEGORIES, CITIES } = require('./db');
 const auth = require('./auth');
 
 const PORT = Number(process.env.PORT) || 3000;
-const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+const PUBLIC_DIR = path.join(__dirname, '..', 'dist');
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
@@ -457,6 +457,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'Method not allowed');
     if (pathname.startsWith('/uploads/')) return serveFile(res, UPLOAD_DIR, pathname.slice('/uploads/'.length));
+    if (!fs.existsSync(path.join(PUBLIC_DIR, 'index.html'))) {
+      res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end('The frontend is not built yet. Run "npm run build" (or "npm run dev" and open http://localhost:5173).');
+    }
     return serveFile(res, PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname.slice(1), { spaFallback: !path.extname(pathname) });
   } catch (e) {
     if (e instanceof HttpError) return send(res, e.status, { error: e.message });

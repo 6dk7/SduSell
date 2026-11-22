@@ -2,14 +2,23 @@
 
 A classifieds marketplace in the style of OLX.kz and Facebook Marketplace. Students and neighbours post things for sale, browse by category and city, save favorites, and contact sellers by phone or WhatsApp.
 
-No npm packages and no build step. Everything runs on Node.js 22.13 or newer.
+The frontend is a React 19 app built with Vite. The backend is still plain Node.js (22.13 or newer) with SQLite and no npm packages, so React and Vite are the only things `npm install` fetches.
 
 ## Run it
 
 ```bash
-cd sdusell
+cd SduSell
+npm install
 npm run seed     # optional: 3 demo users and 23 listings
-npm start        # http://localhost:3000
+npm run build    # builds the React app into dist/
+npm start        # http://localhost:3000 (API + built frontend)
+```
+
+Developing the frontend with hot reload, in two terminals:
+
+```bash
+npm run dev:server   # API on http://localhost:3000
+npm run dev          # React app on http://localhost:5173, proxies /api and /uploads to :3000
 ```
 
 Demo login after seeding: `demo@sdusell.kz` / `password123`.
@@ -36,19 +45,24 @@ PORT=8080 npm start                   # change the port
 ## Project layout
 
 ```
-server/
-  index.js    HTTP server, routes, validation, static files, image uploads
-  db.js       SQLite schema (node:sqlite), categories and cities
-  auth.js     password hashing and sessions
-  seed.js     demo data
-public/
-  index.html  page shell
-  app.js      the whole frontend (hash routing: #/, #/listing/3, #/sell, #/me, #/favorites)
-  styles.css  design
-tests/
-  api.test.js
-data/         created on first run: sdusell.db and uploads/ (not committed)
+server/            unchanged: HTTP server, routes, SQLite, auth, seed data
+index.html         Vite entry (mounts #root)
+vite.config.js     React plugin + dev proxy to the API
+public/assets/     logo, copied as is into dist/
+src/
+  main.jsx         entry: providers + <App />
+  App.jsx          layout and hash routes
+  styles.css       design (unchanged)
+  context/         Session (user, token, categories/cities) and UI (toast, dialog)
+  lib/             api.js, router.js (hash routing hook), hooks.js (useFetch), format.js, categories.js
+  components/      Header/Footer, AuthDialog, FavToggle, ListingCard, Field, Artwork, States
+  pages/           Home, Discovery, Listing, Sell (new + edit), Mine, Favorites
+tests/             server tests (node --test)
+data/              created on first run: sdusell.db and uploads/ (not committed)
+dist/              build output served by the Node server (not committed)
 ```
+
+Routes are the same hash URLs as before: `#/`, `#/listing/3`, `#/sell`, `#/edit/3`, `#/me`, `#/favorites`, `#/discover`.
 
 ## API
 
