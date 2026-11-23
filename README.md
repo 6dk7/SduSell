@@ -34,6 +34,8 @@ PORT=8080 npm start                   # change the port
 - Mark listings as active, reserved or sold
 - Browse curated student-life collections and quick categories on the home page
 - Favorites and a "My listings" page
+- Profile settings at `/#/profile`: edit your name, phone and city; add or remove a profile photo
+- Student email verification preview for official SDU student addresses
 - SDU Finds (`/#/discover`): swipeable discovery cards, saved interests, persistent hidden listings and explained recommendations
 - Works on phones; keyboard focus is visible; reduced motion is respected
 
@@ -47,7 +49,7 @@ server/
   seed.js     demo data
 public/
   index.html  page shell
-  app.js      the whole frontend (hash routing: #/, #/listing/3, #/sell, #/me, #/favorites)
+  app.js      the whole frontend (hash routing: #/, #/listing/3, #/sell, #/me, #/favorites, #/profile)
   styles.css  design
 tests/
   api.test.js
@@ -67,7 +69,7 @@ Send `Authorization: Bearer <token>` for the routes marked with a lock. All bodi
 | POST | `/api/auth/login` | `email, password` returns `token, user` |
 | POST | `/api/auth/logout` | 🔒 |
 | GET | `/api/auth/me` | 🔒 |
-| PUT | `/api/auth/me` | 🔒 `name, phone, city` |
+| PUT | `/api/auth/me` | 🔒 `name, phone, city, avatar?` (avatar is an image data URL or empty string to remove it) |
 | GET | `/api/listings` | query: `q, category` or comma-separated `categories`, `type`, `subject`, `course`, `city, min, max, condition, sort, page, limit, seller` |
 | GET | `/api/listings?mine=1` | 🔒 your listings, including sold |
 | GET | `/api/listings?favorites=1` | 🔒 |
@@ -98,11 +100,18 @@ This is a solid course project, not a production service. Things to add first:
 - Report and moderation tools for listings
 - Backups for `data/`
 
+## Profile and student verification
+
+Open `http://localhost:3000/#/profile` while signed in, or choose **Profile & verification** from the account menu. The profile form saves a user's name, phone number, city and optional photo through `PUT /api/auth/me`. Photos are resized in the browser, stored with the existing upload files, and referenced by the user's `avatar_url`. Existing SQLite databases gain the optional avatar field automatically at startup.
+
+The student verification panel is a **UI preview only**. It accepts an address ending in `@stu.sdu.edu.kz` and displays an honest status message, but it does not send an email, store a verification request, or mark an account as verified. SDU's student services page describes student email addresses in this domain format: [SDU student services](https://sdu.edu.kz/en/student-services/). Before implementing delivery, confirm the accepted student domains with the university and add server-side request storage, rate limits, expiring one-time tokens, confirmation handling, and a persisted verification status. Do not trust a client-side email suffix check as proof of identity.
+
 ## Ideas for next steps
 
 - Turkish interface translation, with a complete review of all user-facing text
 - In-app chat between buyers and sellers, alongside phone and WhatsApp contact
-- Account settings for editing a user's name, phone number, and city
+- Extend the profile editor with account email changes, privacy settings and account recovery
+- Connect the student verification preview to a mail provider and verified-account status
 - Saved searches with notifications when matching listings are posted
 - Seller profiles with ratings and listing history
 - Listing expiry and renewal, plus optional promoted listings

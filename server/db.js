@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
   name          TEXT NOT NULL,
   email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
   phone         TEXT,
+  avatar_url    TEXT,
   city          TEXT,
   password_hash TEXT NOT NULL,
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
@@ -77,6 +78,8 @@ const listingColumns = new Set(db.prepare('PRAGMA table_info(listings)').all().m
 if (!listingColumns.has('listing_type')) db.exec("ALTER TABLE listings ADD COLUMN listing_type TEXT NOT NULL DEFAULT 'sell'");
 if (!listingColumns.has('subject')) db.exec('ALTER TABLE listings ADD COLUMN subject TEXT');
 if (!listingColumns.has('course')) db.exec('ALTER TABLE listings ADD COLUMN course TEXT');
+const userColumns = new Set(db.prepare('PRAGMA table_info(users)').all().map((column) => column.name));
+if (!userColumns.has('avatar_url')) db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT');
 
 const CATEGORIES = [
   'Electronics', 'Transport', 'Fashion', 'Home & Garden',

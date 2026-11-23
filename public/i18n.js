@@ -238,6 +238,38 @@
     'Method not allowed': 'Бұл әрекет қолжетімді емес.', 'Unknown API endpoint': 'API мекенжайы белгісіз.',
     'End of this collection.': 'Бұл топтамада әзірге басқа зат жоқ.', Photo: 'Фото', 'Remove photo': 'Фотосуретті жою', 'Show photo': 'Фотосуретті көрсету',
   });
+  Object.assign(ru, {
+    'Profile & verification': 'Профиль и подтверждение', 'Your profile': 'Ваш профиль',
+    'Log in to view your profile': 'Войдите, чтобы открыть профиль', 'Your profile details and student verification settings are here.': 'Здесь находятся данные профиля и подтверждение статуса студента.',
+    'YOUR ACCOUNT': 'ВАШ АККАУНТ', 'Keep your details current so your campus community knows who they’re buying from.': 'Обновите данные, чтобы участники сообщества знали, у кого покупают.',
+    'ACCOUNT DETAILS': 'ДАННЫЕ АККАУНТА', 'Profile information': 'Информация профиля', 'Profile photo': 'Фото профиля',
+    'Profile photo preview': 'Предпросмотр фото профиля', 'A clear photo helps people recognize you.': 'Чёткое фото поможет другим узнать вас.',
+    'Choose photo': 'Выбрать фото', Remove: 'Убрать', 'Full name': 'Полное имя', 'Account email': 'Почта аккаунта',
+    'Changing your sign-in email will be handled separately.': 'Изменение адреса для входа будет доступно отдельно.', 'Phone number': 'Номер телефона',
+    'Optional. Buyers can use this to contact you.': 'Необязательно. Покупатели смогут связаться с вами по этому номеру.',
+    'Save profile': 'Сохранить профиль', 'Profile saved': 'Профиль сохранён', 'SDU COMMUNITY': 'СООБЩЕСТВО SDU',
+    'Verify your student email': 'Подтвердите студенческую почту', 'A verified university address can help students feel safer buying and selling on campus.': 'Подтверждённая университетская почта помогает студентам безопаснее покупать и продавать на кампусе.',
+    'NOT VERIFIED': 'НЕ ПОДТВЕРЖДЁН', 'University email': 'Университетская почта', 'Use your official SDU student address ending in @stu.sdu.edu.kz.': 'Укажите официальную студенческую почту SDU с окончанием @stu.sdu.edu.kz.',
+    'Request verification email': 'Запросить письмо подтверждения', 'Enter an SDU student email ending in @stu.sdu.edu.kz.': 'Укажите студенческую почту SDU с окончанием @stu.sdu.edu.kz.',
+    'Verification email is not connected yet. No email was sent and your status has not changed.': 'Отправка писем пока не подключена. Письмо не отправлено, статус не изменился.',
+    'Verification is a preview only. Email delivery and account badges will be connected in a future update.': 'Это только предварительный экран. Отправка писем и значок подтверждения появятся в будущем обновлении.',
+  });
+  Object.assign(kk, {
+    'Profile & verification': 'Профиль және растау', 'Your profile': 'Профиліңіз',
+    'Log in to view your profile': 'Профильді көру үшін кіріңіз', 'Your profile details and student verification settings are here.': 'Профиль мәліметтері мен студент мәртебесін растау осында.',
+    'YOUR ACCOUNT': 'АККАУНТЫҢЫЗ', 'Keep your details current so your campus community knows who they’re buying from.': 'Кампус қауымдастығы сізді танып-білуі үшін мәліметтерді жаңартып отырыңыз.',
+    'ACCOUNT DETAILS': 'АККАУНТ МӘЛІМЕТТЕРІ', 'Profile information': 'Профиль ақпараты', 'Profile photo': 'Профиль суреті',
+    'Profile photo preview': 'Профиль суретінің алдын ала көрінісі', 'A clear photo helps people recognize you.': 'Анық сурет адамдарға сізді тануға көмектеседі.',
+    'Choose photo': 'Суретті таңдау', Remove: 'Алып тастау', 'Full name': 'Толық аты-жөні', 'Account email': 'Аккаунт поштасы',
+    'Changing your sign-in email will be handled separately.': 'Кіру поштасын өзгерту бөлек іске асырылады.', 'Phone number': 'Телефон нөмірі',
+    'Optional. Buyers can use this to contact you.': 'Міндетті емес. Сатып алушылар осы нөмір арқылы хабарласа алады.',
+    'Save profile': 'Профильді сақтау', 'Profile saved': 'Профиль сақталды', 'SDU COMMUNITY': 'SDU ҚАУЫМДАСТЫҒЫ',
+    'Verify your student email': 'Студенттік поштаңызды растаңыз', 'A verified university address can help students feel safer buying and selling on campus.': 'Расталған университет поштасы кампуста сауда жасауды қауіпсіз етеді.',
+    'NOT VERIFIED': 'РАСТАЛМАҒАН', 'University email': 'Университет поштасы', 'Use your official SDU student address ending in @stu.sdu.edu.kz.': '@stu.sdu.edu.kz деп аяқталатын ресми SDU студенттік поштасын енгізіңіз.',
+    'Request verification email': 'Растау хатын сұрату', 'Enter an SDU student email ending in @stu.sdu.edu.kz.': '@stu.sdu.edu.kz деп аяқталатын SDU студенттік поштасын енгізіңіз.',
+    'Verification email is not connected yet. No email was sent and your status has not changed.': 'Хат жіберу әлі қосылмаған. Хат жіберілген жоқ, мәртебе өзгермеді.',
+    'Verification is a preview only. Email delivery and account badges will be connected in a future update.': 'Бұл тек алдын ала нұсқа. Хат жіберу мен растау белгісі болашақ жаңартуда қосылады.',
+  });
   const translations = { en: {}, ru, kk };
   const key = 'sdusell_locale';
   const supported = ['en', 'ru', 'kk'];

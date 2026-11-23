@@ -98,6 +98,7 @@ ul { padding: 0; list-style: none; }
 .avatar {
   display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
   background: var(--ink); color: #fff; font-family: var(--font-display); font-weight: 600; font-size: 15px;
+  object-fit: cover;
 }
 .avatar-lg { width: 52px; height: 52px; font-size: 18px; flex: none; }
 
@@ -577,3 +578,47 @@ dialog::backdrop { background: rgba(18, 38, 46, 0.55); }
 
 .footer-logo { display: inline-flex; align-items: center; gap: 8px; }
 .footer-logo-mark { display: block; width: 28px; height: 28px; flex: none; }
+
+/* ---------- profile and student verification preview ---------- */
+.profile-page { max-width: 1120px; }
+.profile-heading { margin: 16px 0 28px; }
+.profile-heading .page-title { margin: 0 0 8px; }
+.profile-heading > .muted { max-width: 590px; line-height: 1.65; }
+.profile-layout { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(310px, .92fr); gap: 22px; align-items: start; }
+.profile-panel, .verification-panel { border: 1px solid var(--line); border-radius: 22px; padding: 28px; background: var(--surface); }
+.profile-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 24px; }
+.profile-panel-heading h2, .verification-panel h2 { font-family: var(--font-display); color: var(--ink); font-weight: 600; font-size: 22px; letter-spacing: -.035em; }
+.profile-panel-heading .eyebrow, .verification-panel .eyebrow { margin-bottom: 7px; }
+.profile-edit-mark { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: #E8EDF9; color: var(--brand); font-size: 20px; }
+.profile-photo-row { display: flex; align-items: center; gap: 18px; padding: 18px; margin-bottom: 24px; border-radius: 16px; background: var(--paper); }
+.profile-photo-row > div:last-child { min-width: 0; }
+.profile-photo-row strong { color: var(--ink); font-size: 14px; }
+.profile-photo-row .muted { margin: 4px 0 10px; font-size: 12px; }
+.profile-avatar { display: grid; place-items: center; flex: 0 0 76px; width: 76px; height: 76px; overflow: hidden; border: 3px solid var(--surface); border-radius: 50%; background: var(--ink); color: white; font-family: var(--font-display); font-size: 28px; font-weight: 700; box-shadow: 0 0 0 1px var(--line); }
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-photo-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.profile-photo-controls .btn { min-height: 36px; padding-inline: 12px; font-size: 12px; }
+.profile-form { gap: 16px; }
+.profile-form input[readonly] { background: var(--paper); color: var(--ink-2); cursor: not-allowed; }
+.verification-panel { position: relative; overflow: hidden; background: #F3F6FF; border-color: #DCE5FC; }
+.verification-panel::after { position: absolute; top: -42px; right: -42px; width: 142px; height: 142px; border-radius: 50%; background: #E3EAFE; content: ''; }
+.verification-topline { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; }
+.verification-symbol { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px; background: var(--surface); color: #7584A8; font-size: 19px; font-weight: 700; box-shadow: 0 3px 12px #17234210; }
+.verification-badge { padding: 6px 10px; border: 1px solid #CFD9F1; border-radius: 999px; background: var(--surface); color: #647391; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.verification-panel > .eyebrow { color: var(--brand); }
+.verification-panel h2 { max-width: 340px; font-size: 27px; line-height: 1.13; }
+.verification-copy { max-width: 390px; margin: 12px 0 24px; color: var(--ink-2); font-size: 14px; line-height: 1.65; }
+.verify-form { display: grid; gap: 14px; }
+.verify-form .hint { line-height: 1.55; }
+.verify-message { min-height: 0; margin: 0; color: #205C46; font-size: 13px; line-height: 1.55; }
+.verify-message:empty { display: none; }
+.verify-message.is-error { color: var(--danger); }
+.verification-note { margin-top: 20px; padding-top: 16px; border-top: 1px solid #DCE5FC; color: #667594; font-size: 11px; line-height: 1.6; }
+@media (max-width: 820px) { .profile-layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 560px) {
+  .profile-heading { margin: 8px 0 20px; }
+  .profile-panel, .verification-panel { padding: 21px; border-radius: 18px; }
+  .profile-photo-row { align-items: flex-start; gap: 13px; padding: 14px; }
+  .profile-avatar { flex-basis: 62px; width: 62px; height: 62px; font-size: 23px; }
+  .verification-panel h2 { font-size: 24px; }
+}

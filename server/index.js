@@ -224,7 +224,7 @@ function getListing(id, viewer) {
   const isOwner = viewer && viewer.id === row.user_id;
   if (row.status === 'sold' && !isOwner) throw new HttpError(404, 'Listing not found');
   const images = db.prepare('SELECT url FROM images WHERE listing_id = ? ORDER BY position').all(id).map((i) => i.url);
-  const seller = db.prepare('SELECT id, name, phone, city, created_at FROM users WHERE id = ?').get(row.user_id);
+  const seller = db.prepare('SELECT id, name, phone, avatar_url, city, created_at FROM users WHERE id = ?').get(row.user_id);
   const activeCount = db.prepare("SELECT COUNT(*) AS n FROM listings WHERE user_id = ? AND status = 'active'").get(row.user_id).n;
   return { ...shape(row), images, seller: { ...seller, phone: row.status === 'reserved' && !isOwner ? '' : seller.phone, active_listings: activeCount } };
 }
@@ -345,7 +345,16 @@ route('PUT', '/api/auth/me', async (req) => {
   const name = str(b.name, 60) || user.name;
   const city = CITIES.includes(b.city) ? b.city : '';
   const phone = cleanPhone(b.phone);
-  db.prepare('UPDATE users SET name = ?, phone = ?, city = ? WHERE id = ?').run(name, phone, city, user.id);
+  let avatarUrl = user.avatar_url || '';
+  if (b.avatar !== undefined) {
+    if (b.avatar === null || b.avatar === '') avatarUrl = '';
+    else if (typeof b.avatar === 'string' && b.avatar.startsWith('data:')) avatarUrl = saveDataUrl(b.avatar);
+    else if (typeof b.avatar === 'string' && b.avatar === user.avatar_url && /^\/uploads\/[a-f0-9]{24}\.(png|jpg|webp)$/.test(b.avatar)) avatarUrl = b.avatar;
+    else throw new HttpError(400, 'Bad avatar image');
+  }
+  db.prepare('UPDATE users SET name = ?, phone = ?, city = ?, avatar_url = ? WHERE id = ?')
+    .run(name, phone, city, avatarUrl || null, user.id);
+  if (user.avatar_url && user.avatar_url !== avatarUrl) deleteUploadFiles([user.avatar_url]);
   return { user: auth.getUserFromToken(bearer(req)) };
 });
 

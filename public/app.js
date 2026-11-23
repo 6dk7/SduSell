@@ -274,10 +274,13 @@ function renderActions() {
   }
   const menu = h('details', { class: 'menu' },
     h('summary', { 'aria-label': 'Account menu' },
-      h('span', { class: 'avatar' }, state.user.name.trim().charAt(0).toUpperCase()),
+      state.user.avatar_url
+        ? h('img', { class: 'avatar', src: state.user.avatar_url, alt: '' })
+        : h('span', { class: 'avatar' }, state.user.name.trim().charAt(0).toUpperCase()),
     ),
     h('div', { class: 'menu-panel' },
       h('p', { class: 'menu-name' }, raw(state.user.name)),
+      h('a', { href: '#/profile' }, 'Profile & verification'),
       h('a', { href: '#/me' }, 'My listings'),
       h('a', { href: '#/favorites' }, 'Favorites'),
       h('button', { type: 'button', onclick: logout }, 'Log out'),
@@ -776,7 +779,9 @@ async function viewListing(id) {
     contact,
     isOwner ? null : favToggle(l, { labelled: true }),
     h('div', { class: 'seller' },
-      h('span', { class: 'avatar avatar-lg' }, raw(l.seller.name.trim().charAt(0).toUpperCase())),
+      l.seller.avatar_url
+        ? h('img', { class: 'avatar avatar-lg', src: l.seller.avatar_url, alt: '' })
+        : h('span', { class: 'avatar avatar-lg' }, raw(l.seller.name.trim().charAt(0).toUpperCase())),
       h('div', {},
         h('p', { class: 'seller-name' }, raw(l.seller.name)),
         h('p', { class: 'muted' }, window.sduLocale?.() === 'ru' ? `На SduSell с ${since}` : window.sduLocale?.() === 'kk' ? `SduSell-де ${since} жылдан бері` : `On SduSell since ${since}`),
@@ -1006,6 +1011,132 @@ async function viewFavorites() {
   return wrap;
 }
 
+async function viewProfile() {
+  if (!state.user) {
+    document.title = `${t('Your profile')} - SduSell`;
+    return h('div', { class: 'page narrow' },
+      emptyState('Log in to view your profile', 'Your profile details and student verification settings are here.',
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: () => openAuth('login') }, 'Log in')));
+  }
+
+  const { user } = await api('/auth/me');
+  state.user = user;
+  document.title = `${t('Your profile')} - SduSell`;
+  $q.value = '';
+
+  let avatarDraft = user.avatar_url || '';
+  const avatarPreview = h('div', { class: 'profile-avatar' });
+  let photoRemoveButton;
+  const drawAvatar = () => avatarPreview.replaceChildren(
+    avatarDraft
+      ? h('img', { src: avatarDraft, alt: t('Profile photo preview') })
+      : h('span', { 'aria-hidden': 'true' }, user.name.trim().charAt(0).toUpperCase() || '?'),
+  );
+  const refreshAvatar = () => {
+    drawAvatar();
+    if (photoRemoveButton) photoRemoveButton.disabled = !avatarDraft;
+  };
+  refreshAvatar();
+
+  const avatarInput = h('input', {
+    class: 'visually-hidden', type: 'file', accept: 'image/png,image/jpeg,image/webp',
+    'aria-label': 'Choose a profile photo',
+    onchange: async (e) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      try {
+        avatarDraft = await readImage(file);
+        refreshAvatar();
+      } catch (ex) { toast(t(ex.message)); }
+    },
+  });
+
+  const profileForm = h('form', { class: 'form profile-form', novalidate: true });
+  const profileError = h('p', { class: 'form-error', role: 'alert' });
+  const saveButton = h('button', { class: 'btn btn-primary', type: 'submit' }, 'Save profile');
+  profileForm.append(
+    field('Full name', h('input', { name: 'name', value: user.name, autocomplete: 'name', required: true, maxlength: 60 })),
+    field('Account email', h('input', { type: 'email', value: user.email, readonly: true, autocomplete: 'email' }), 'Changing your sign-in email will be handled separately.'),
+    field('Phone number', h('input', { name: 'phone', type: 'tel', value: user.phone || '', autocomplete: 'tel', placeholder: '+7 701 123 45 67' }), 'Optional. Buyers can use this to contact you.'),
+    field('City', citySelect(user.city || '', true)),
+    profileError,
+    h('div', { class: 'form-actions' }, saveButton),
+  );
+
+  profileForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = Object.fromEntries(new FormData(profileForm));
+    if (!String(formData.name || '').trim()) {
+      profileError.textContent = t('Please enter your name');
+      profileForm.elements.name.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    profileError.textContent = '';
+    try {
+      const result = await api('/auth/me', { method: 'PUT', body: { ...formData, avatar: avatarDraft } });
+      state.user = result.user;
+      avatarDraft = result.user.avatar_url || '';
+      refreshAvatar();
+      renderActions();
+      toast(t('Profile saved'));
+    } catch (ex) {
+      profileError.textContent = t(ex.message);
+    } finally { saveButton.disabled = false; }
+  });
+
+  const photoControls = h('div', { class: 'profile-photo-controls' },
+    h('label', { class: 'btn btn-quiet', for: 'profile-photo-input' }, 'Choose photo'),
+    (photoRemoveButton = h('button', { class: 'btn btn-quiet', type: 'button', disabled: !avatarDraft, onclick: () => { avatarDraft = ''; refreshAvatar(); } }, 'Remove')),
+  );
+  avatarInput.id = 'profile-photo-input';
+
+  const verifyMessage = h('p', { class: 'verify-message', role: 'status', 'aria-live': 'polite' });
+  const verifyForm = h('form', { class: 'verify-form', novalidate: true });
+  const verifyEmail = h('input', { name: 'student_email', type: 'email', autocomplete: 'email', placeholder: 'student ID@stu.sdu.edu.kz', required: true });
+  const verifyButton = h('button', { class: 'btn btn-primary', type: 'submit' }, 'Request verification email');
+  verifyForm.append(field('University email', verifyEmail, 'Use your official SDU student address ending in @stu.sdu.edu.kz.'), verifyMessage, verifyButton);
+  verifyForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const email = verifyEmail.value.trim().toLowerCase();
+    if (!/^[^\s@]+@stu\.sdu\.edu\.kz$/.test(email)) {
+      verifyMessage.textContent = t('Enter an SDU student email ending in @stu.sdu.edu.kz.');
+      verifyMessage.classList.add('is-error');
+      verifyEmail.focus();
+      return;
+    }
+    verifyMessage.textContent = t('Verification email is not connected yet. No email was sent and your status has not changed.');
+    verifyMessage.classList.remove('is-error');
+  });
+
+  return h('div', { class: 'page profile-page' },
+    h('div', { class: 'profile-heading' },
+      h('span', { class: 'eyebrow' }, 'YOUR ACCOUNT'),
+      h('h1', { class: 'page-title' }, 'Your profile'),
+      h('p', { class: 'muted' }, 'Keep your details current so your campus community knows who they’re buying from.'),
+    ),
+    h('div', { class: 'profile-layout' },
+      h('section', { class: 'profile-panel', 'aria-labelledby': 'profile-details-heading' },
+        h('div', { class: 'profile-panel-heading' },
+          h('div', {}, h('span', { class: 'eyebrow' }, 'ACCOUNT DETAILS'), h('h2', { id: 'profile-details-heading' }, 'Profile information')),
+          h('span', { class: 'profile-edit-mark', 'aria-hidden': 'true' }, '✳'),
+        ),
+        h('div', { class: 'profile-photo-row' }, avatarPreview, h('div', {}, h('strong', {}, 'Profile photo'), h('p', { class: 'muted' }, 'A clear photo helps people recognize you.'), photoControls, avatarInput)),
+        profileForm,
+      ),
+      h('aside', { class: 'verification-panel', 'aria-labelledby': 'verification-heading' },
+        h('div', { class: 'verification-topline' }, h('span', { class: 'verification-symbol', 'aria-hidden': 'true' }, '✓'), h('span', { class: 'verification-badge' }, 'NOT VERIFIED')),
+        h('span', { class: 'eyebrow' }, 'SDU COMMUNITY'),
+        h('h2', { id: 'verification-heading' }, 'Verify your student email'),
+        h('p', { class: 'verification-copy' }, 'A verified university address can help students feel safer buying and selling on campus.'),
+        verifyForm,
+        h('p', { class: 'verification-note' }, 'Verification is a preview only. Email delivery and account badges will be connected in a future update.'),
+      ),
+    ),
+  );
+}
+
 // ---------- router ----------
 let renderId = 0;
 
@@ -1023,6 +1154,7 @@ async function render() {
     else if (parts[0] === 'sell') node = await viewSell();
     else if (parts[0] === 'edit' && parts[1]) node = await viewSell(Number(parts[1]));
     else if (parts[0] === 'me') node = await viewMine();
+    else if (parts[0] === 'profile') node = await viewProfile();
     else if (parts[0] === 'favorites') node = await viewFavorites();
     else node = h('div', { class: 'page narrow' }, emptyState('Page not found', 'This address does not lead anywhere on SduSell.', h('a', { class: 'btn btn-primary', href: '#/' }, 'Go to all listings')));
     if (id !== renderId) return;

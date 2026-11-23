@@ -27,7 +27,7 @@ function createSession(userId) {
 function getUserFromToken(token) {
   if (!token) return null;
   const row = db.prepare(`
-    SELECT u.id, u.name, u.email, u.phone, u.city, u.created_at, s.expires_at
+    SELECT u.id, u.name, u.email, u.phone, u.avatar_url, u.city, u.created_at, s.expires_at
     FROM sessions s JOIN users u ON u.id = s.user_id
     WHERE s.token = ?`).get(token);
   if (!row) return null;
