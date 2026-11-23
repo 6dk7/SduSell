@@ -2,14 +2,35 @@
 
 A classifieds marketplace in the style of OLX.kz and Facebook Marketplace. Students and neighbours post things for sale, browse by category and city, save favorites, and contact sellers by phone or WhatsApp.
 
-No npm packages and no build step. Everything runs on Node.js 22.13 or newer.
+The frontend is a React 19 app built with Vite. The backend is still plain Node.js (22.13 or newer) with SQLite and no npm packages, so React and Vite are the only things `npm install` fetches.
 
 ## Run it
 
 ```bash
-cd sdusell
+cd SduSell
+npm install
 npm run seed     # optional: 3 demo users and 23 listings
-npm start        # http://localhost:3000
+npm run build    # builds the React app into dist/
+npm start        # http://localhost:3000 (API + built frontend)
+```
+
+Developing the frontend with hot reload, in two terminals:
+
+```bash
+npm run dev:server   # API on http://localhost:3000
+npm run dev          # React app on http://localhost:5173, proxies /api and /uploads to :3000
+```
+
+On Windows PowerShell, to use the React app at `http://localhost:5174` with an API server at `http://localhost:3001`, run these in two terminals:
+
+```powershell
+$env:PORT = "3001"
+npm run dev:server
+```
+
+```powershell
+$env:PORT = "3001"
+npm run dev -- --port 5174
 ```
 
 Demo login after seeding: `demo@sdusell.kz` / `password123`.
@@ -25,16 +46,12 @@ PORT=8080 npm start                   # change the port
 ## What it does
 
 - Sign up and log in (passwords hashed with scrypt, sessions expire after 14 days)
-- Post, edit, and delete listings; set their status to active, reserved, or sold
+- Post, edit, delete a listing; mark it as sold or available again
 - Up to 8 photos per listing, resized in the browser before upload; choose the cover photo
 - Browse with search (works for Russian and English), category, city, price range, condition and sort
-- Switch the interface between Russian, Kazakh and English
 - Listing page with gallery, "Show phone number", WhatsApp link, seller info and view count
-- Publish listings to sell, exchange, give away or request an item; add subject and course details to books
-- Mark listings as active, reserved or sold
-- Browse curated student-life collections and quick categories on the home page
 - Favorites and a "My listings" page
-- Profile settings at `/#/profile`: edit your name, phone and city; add or remove a profile photo
+- Profile settings: edit your name, phone and city, and add or remove a profile photo
 - Student email verification preview for official SDU student addresses
 - SDU Finds (`/#/discover`): swipeable discovery cards, saved interests, persistent hidden listings and explained recommendations
 - Works on phones; keyboard focus is visible; reduced motion is respected
@@ -42,19 +59,24 @@ PORT=8080 npm start                   # change the port
 ## Project layout
 
 ```
-server/
-  index.js    HTTP server, routes, validation, static files, image uploads
-  db.js       SQLite schema (node:sqlite), categories and cities
-  auth.js     password hashing and sessions
-  seed.js     demo data
-public/
-  index.html  page shell
-  app.js      the whole frontend (hash routing: #/, #/listing/3, #/sell, #/me, #/favorites, #/profile)
-  styles.css  design
-tests/
-  api.test.js
-data/         created on first run: sdusell.db and uploads/ (not committed)
+server/            HTTP server, routes, SQLite, auth, profile photo upload, seed data
+index.html         Vite entry (mounts #root)
+vite.config.js     React plugin + dev proxy to the API
+public/assets/     logo, copied as is into dist/
+src/
+  main.jsx         entry: providers + <App />
+  App.jsx          layout and hash routes
+  styles.css       design (unchanged)
+  context/         Session (user, token, categories/cities) and UI (toast, dialog)
+  lib/             api.js, router.js (hash routing hook), hooks.js (useFetch), format.js, categories.js
+  components/      Header/Footer, AuthDialog, FavToggle, ListingCard, Field, Artwork, States
+  pages/           Home, Discovery, Listing, Sell (new + edit), Mine, Favorites, Profile
+tests/             server tests (node --test)
+data/              created on first run: sdusell.db and uploads/ (not committed)
+dist/              build output served by the Node server (not committed)
 ```
+
+Routes are hash URLs: `#/`, `#/listing/3`, `#/sell`, `#/edit/3`, `#/me`, `#/favorites`, `#/discover`, and `#/profile`.
 
 ## API
 
@@ -70,13 +92,13 @@ Send `Authorization: Bearer <token>` for the routes marked with a lock. All bodi
 | POST | `/api/auth/logout` | 🔒 |
 | GET | `/api/auth/me` | 🔒 |
 | PUT | `/api/auth/me` | 🔒 `name, phone, city, avatar?` (avatar is an image data URL or empty string to remove it) |
-| GET | `/api/listings` | query: `q, category` or comma-separated `categories`, `type`, `subject`, `course`, `city, min, max, condition, sort, page, limit, seller` |
+| GET | `/api/listings` | query: `q, category, city, min, max, condition, sort, page, limit, seller` |
 | GET | `/api/listings?mine=1` | 🔒 your listings, including sold |
 | GET | `/api/listings?favorites=1` | 🔒 |
 | GET | `/api/listings/:id` | includes `images` and `seller` |
-| POST | `/api/listings` | 🔒 `title, description, price, category, city, condition, listing_type, subject?, course?, negotiable, images[]` |
-| PUT | `/api/listings/:id` | 🔒 owner only; accepts the same listing fields |
-| PATCH | `/api/listings/:id/status` | 🔒 owner only, `{ "status": "active" \| "reserved" \| "sold" }` |
+| POST | `/api/listings` | 🔒 `title, description, price, category, city, condition, negotiable, images[]` |
+| PUT | `/api/listings/:id` | 🔒 owner only |
+| PATCH | `/api/listings/:id/status` | 🔒 owner only, `{ "status": "sold" \| "active" }` |
 | DELETE | `/api/listings/:id` | 🔒 owner only |
 | POST / DELETE | `/api/listings/:id/favorite` | 🔒 |
 
@@ -102,24 +124,20 @@ This is a solid course project, not a production service. Things to add first:
 
 ## Profile and student verification
 
-Open `http://localhost:3000/#/profile` while signed in, or choose **Profile & verification** from the account menu. The profile form saves a user's name, phone number, city and optional photo through `PUT /api/auth/me`. Photos are resized in the browser, stored with the existing upload files, and referenced by the user's `avatar_url`. Existing SQLite databases gain the optional avatar field automatically at startup.
+Sign in and open **Profile & verification** from the account menu, or go directly to `http://localhost:3000/#/profile`. The profile form saves a user's name, phone number, city and optional photo through `PUT /api/auth/me`. The browser resizes photos before upload. The server stores the image in `data/uploads/` and records its path in the `users.avatar_url` field in SQLite. Existing databases gain this optional field automatically when the server starts.
 
-The student verification panel is a **UI preview only**. It accepts an address ending in `@stu.sdu.edu.kz` and displays an honest status message, but it does not send an email, store a verification request, or mark an account as verified. SDU's student services page describes student email addresses in this domain format: [SDU student services](https://sdu.edu.kz/en/student-services/). Before implementing delivery, confirm the accepted student domains with the university and add server-side request storage, rate limits, expiring one-time tokens, confirmation handling, and a persisted verification status. Do not trust a client-side email suffix check as proof of identity.
+The university email panel is a preview only. It accepts an address ending in `@stu.sdu.edu.kz` and shows a clear status message, but it does not send an email, save a verification request, or mark an account verified. Before implementing real verification, confirm accepted student email domains with SDU, then add server-side request storage, rate limits, expiring one-time tokens, confirmation handling and a persisted verification status. A client-side suffix check is not proof of identity.
 
 ## Ideas for next steps
 
-- Turkish interface translation, with a complete review of all user-facing text
-- In-app chat between buyers and sellers, alongside phone and WhatsApp contact
-- Extend the profile editor with account email changes, privacy settings and account recovery
-- Connect the student verification preview to a mail provider and verified-account status
-- Saved searches with notifications when matching listings are posted
-- Seller profiles with ratings and listing history
-- Listing expiry and renewal, plus optional promoted listings
+- Kazakh and Russian interface language switch
+- Chat between buyer and seller instead of phone and WhatsApp only
+- Account email changes, privacy settings and recovery
+- Connect student verification to a mail provider and persisted verified status
+- Promoted listings, saved searches, listing expiry after 30 days
 
 ## SDU Finds
 
 Open `http://localhost:3000/#/discover`. Save a listing to influence recommendations; use “Not for me” to hide it. Guests can browse without logging in. A collection ends after the available listings or 100 cards.
 
 The rule-based algorithm prioritizes favorite categories and mixes in other categories. It excludes sold, owned, saved and hidden listings. Preferences persist in SQLite; ordinary skips only last for the current collection.
-
-Listing types are `sell`, `exchange`, `free` and `wanted`; status values are `active`, `reserved` and `sold`. Older databases receive the new optional listing columns in place when the server starts.
